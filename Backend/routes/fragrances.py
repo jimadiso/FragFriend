@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from Backend.services import fragrance_service
 
 router = APIRouter(
@@ -8,8 +8,8 @@ router = APIRouter(
 
 @router.get("/")
 def get_fragrances(
-    limit: int = 20,
-    offset: int = 0
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0)
 ):
     return fragrance_service.get_fragrances(
         limit=limit,
