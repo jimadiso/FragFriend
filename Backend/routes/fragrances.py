@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from Backend.services import fragrance_service
 
 router = APIRouter(
@@ -53,4 +53,12 @@ def search_fragrances(
 
 @router.get("/{fragrance_id}")
 def get_fragrance_by_id(fragrance_id: int):
-    return fragrance_service.get_fragrance_by_id(fragrance_id)
+    fragrance = fragrance_service.get_fragrance_by_id(fragrance_id)
+
+    if fragrance is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Fragrance not found",
+        )
+
+    return fragrance
