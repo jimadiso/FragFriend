@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
+from typing import Literal
 from Backend.services import fragrance_service
 
 router = APIRouter(
@@ -23,17 +24,54 @@ def search_fragrances(
     country: str = None,
     gender: str = None,
     accord: str = None,
-    sort_by: str = None,
-    min_rating: float = None,
-    max_rating: float = None,
-    year_from: int = None,
-    year_to: int = None,
-    min_vote: int = None,
-    max_vote: int = None,
-    order: str = 'asc',
-    limit: int = 20,
-    offset: int = 0
+    sort_by: Literal[
+    "rating",
+    "popularity",
+    "year",
+    "brand",
+    "country",
+    "name",
+    ] | None = None,
+    min_rating: float | None = Query(None, ge=0, le=5),
+    max_rating: float | None = Query(None, ge=0, le=5),
+    year_from: int | None = Query(None, ge=1700, le=2027),
+    year_to: int | None = Query(None, ge=1700, le=2027),
+    min_vote: int | None = Query(None, ge=0),
+    max_vote: int | None = Query(None, ge=0),
+    order: Literal['asc', 'desc'] = 'asc',
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0)   
 ):
+    if (
+        min_rating is not None
+        and max_rating is not None
+        and min_rating > max_rating
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="min_rating cannot be greater than max_rating",
+        )
+
+    if (
+        year_from is not None
+        and year_to is not None
+        and year_from > year_to
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="year_from cannot be greater than year_to",
+        )
+
+    if (
+        min_vote is not None
+        and max_vote is not None
+        and min_vote > max_vote
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="min_vote cannot be greater than max_vote",
+        )
+
     return fragrance_service.search_fragrances(
         brand=brand,
         country=country,
