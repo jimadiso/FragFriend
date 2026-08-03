@@ -1,5 +1,12 @@
-from fastapi import APIRouter, HTTPException, Query
 from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query
+
+from Backend.models.fragrance import (
+    FragranceDetail,
+    FragranceSearchResult,
+    FragranceSummary,
+)
 from Backend.services import fragrance_service
 
 router = APIRouter(
@@ -7,7 +14,7 @@ router = APIRouter(
     tags=["Fragrances"]
 )
 
-@router.get("/")
+@router.get("/", response_model=list[FragranceSummary])
 def get_fragrances(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0)
@@ -18,7 +25,7 @@ def get_fragrances(
     )
 
 
-@router.get("/search")
+@router.get("/search", response_model=list[FragranceSearchResult])
 def search_fragrances(
     brand: str = None,
     country: str = None,
@@ -89,7 +96,7 @@ def search_fragrances(
         offset=offset
     )
 
-@router.get("/{fragrance_id}")
+@router.get("/{fragrance_id}", response_model=FragranceDetail)
 def get_fragrance_by_id(fragrance_id: int):
     fragrance = fragrance_service.get_fragrance_by_id(fragrance_id)
 
