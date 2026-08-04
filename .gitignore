@@ -20,3 +20,6 @@ Thumbs.db
 
 # Data files
 Fragrance_Data/
+
+# Test Files
+.pytest_cache/
