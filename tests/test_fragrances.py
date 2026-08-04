@@ -122,3 +122,32 @@ def test_invalid_parameters_return_422(url):
     response = client.get(url)
 
     assert response.status_code == 422
+
+def test_cors_allows_frontend_origin():
+    response = client.options(
+        "/fragrances/",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.headers["access-control-allow-origin"]
+        == "http://localhost:5173"
+    )
+    assert "GET" in response.headers["access-control-allow-methods"]
+
+
+def test_cors_rejects_unknown_origin():
+    response = client.options(
+        "/fragrances/",
+        headers={
+            "Origin": "https://untrusted.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
