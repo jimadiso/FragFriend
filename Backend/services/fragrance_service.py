@@ -2,6 +2,7 @@ from sqlalchemy import text
 from Backend.database import engine
 
 def search_fragrances(
+    name: str = None,
     brand: str = None,
     country: str = None,
     gender: str = None,
@@ -34,6 +35,10 @@ def search_fragrances(
     "country": "country",
     "name": "perfume" 
     }
+
+    if name:
+        query += " AND perfume ILIKE :name"
+        params["name"] = f"%{name}%"
 
     if brand:
         query += " AND brand ILIKE :brand"

@@ -27,6 +27,7 @@ def get_fragrances(
 
 @router.get("/search", response_model=list[FragranceSearchResult])
 def search_fragrances(
+    name: str = None,
     brand: str = None,
     country: str = None,
     gender: str = None,
@@ -80,6 +81,7 @@ def search_fragrances(
         )
 
     return fragrance_service.search_fragrances(
+        name=name,
         brand=brand,
         country=country,
         gender=gender,

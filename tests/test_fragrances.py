@@ -61,19 +61,25 @@ def test_get_fragrances(monkeypatch):
 
 
 def test_search_fragrances(monkeypatch):
+    received_parameters = {}
+
+    def fake_search(**kwargs):
+        received_parameters.update(kwargs)
+        return [SEARCH_RESULT]
+
     monkeypatch.setattr(
         fragrance_service,
         "search_fragrances",
-        lambda **kwargs: [SEARCH_RESULT],
+        fake_search,
     )
 
     response = client.get(
-        "/fragrances/search?brand=Dior&limit=5&offset=0"
+        "/fragrances/search?name=Dior%20Me&limit=5&offset=0"
     )
 
     assert response.status_code == 200
     assert response.json() == [SEARCH_RESULT]
-
+    assert received_parameters["name"] == "Dior Me"
 
 def test_get_fragrance_by_id(monkeypatch):
     monkeypatch.setattr(

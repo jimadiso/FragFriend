@@ -1,6 +1,8 @@
 import { useState, type SyntheticEvent } from 'react'
 import './App.css'
 
+type SearchMode = 'brand' | 'name'
+
 type Fragrance = {
   id: number
   perfume: string
@@ -13,7 +15,8 @@ type Fragrance = {
 }
 
 function App() {
-  const [brand, setBrand] = useState('')
+  const [searchMode, setSearchMode] = useState<SearchMode>('brand')
+  const [query, setQuery] = useState('')
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -22,10 +25,14 @@ function App() {
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const trimmedBrand = brand.trim()
+    const trimmedQuery = query.trim()
 
-    if (!trimmedBrand) {
-      setError('Enter a fragrance brand.')
+    if (!trimmedQuery) {
+      setError(
+        searchMode === 'brand'
+          ? 'Enter a fragrance brand.'
+          : 'Enter a fragrance name.',
+      )
       return
     }
 
@@ -35,7 +42,7 @@ function App() {
 
     try {
       const parameters = new URLSearchParams({
-        brand: trimmedBrand,
+        [searchMode]: trimmedQuery,
         limit: '20',
         offset: '0',
       })
@@ -60,25 +67,61 @@ function App() {
     }
   }
 
+  function changeSearchMode(mode: SearchMode) {
+    setSearchMode(mode)
+    setQuery('')
+    setFragrances([])
+    setError('')
+    setHasSearched(false)
+  }
+
   return (
     <main className="app">
       <section className="search-section">
         <p className="eyebrow">FragFriend</p>
         <h1>Find your next fragrance</h1>
         <p className="introduction">
-          Search the fragrance collection by brand.
+          Search the fragrance collection by{' '}{searchMode === 'brand' ? 'brand' : 'fragrance name'}.
         </p>
 
         <form className="search-form" onSubmit={handleSubmit}>
-          <label htmlFor="brand-search">Brand</label>
+          <div className="search-label-row">
+            <div className="search-modifier" aria-label="Search type">
+              <button
+                type="button"
+                className={searchMode === 'brand' ? 'active' : ''}
+                aria-pressed={searchMode === 'brand'}
+                onClick={() => changeSearchMode('brand')}
+              >
+                Brand
+              </button>
+
+              <button
+                type="button"
+                className={searchMode === 'name' ? 'active' : ''}
+                aria-pressed={searchMode === 'name'}
+                onClick={() => changeSearchMode('name')}
+              >
+                Fragrance
+              </button>
+            </div>
+
+            <label htmlFor="fragrance-search">
+              Search by {searchMode === 'brand' ? 'brand' : 'fragrance'}
+            </label>
+          </div>
 
           <div className="search-controls">
             <input
-              id="brand-search"
+              id="fragrance-search"
               type="search"
-              value={brand}
-              onChange={(event) => setBrand(event.target.value)}
-              placeholder="Try Dior, Chanel, or Gucci"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={
+                searchMode === 'brand'
+                  ? 'Try Dior, Chanel, or Gucci'
+                  : 'Try Dior Me Dior Me Not'
+              }
             />
 
             <button type="submit" disabled={loading}>
@@ -99,8 +142,8 @@ function App() {
           <div className="no-results">
             <h2>No matching fragrances found</h2>
             <p>
-              We couldn&apos;t find any fragrances from “{brand.trim()}”. Check the
-              spelling or try another brand.
+              We couldn&apos;t find any fragrances from “{query.trim()}”. Check the
+              spelling or try another{' '}{searchMode === 'brand' ? 'brand' : 'fragrance'}.
             </p>
           </div>
         )}
