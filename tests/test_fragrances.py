@@ -74,12 +74,25 @@ def test_search_fragrances(monkeypatch):
     )
 
     response = client.get(
-        "/fragrances/search?name=Dior%20Me&limit=5&offset=0"
+        "/fragrances/search"
+        "?name=Dior%20Me"
+        "&gender=Women"
+        "&note=Cherry"
+        "&min_rating=3.5"
+        "&year_from=2000"
+        "&year_to=2010"
+        "&limit=5"
+        "&offset=0"
     )
 
     assert response.status_code == 200
     assert response.json() == [SEARCH_RESULT]
     assert received_parameters["name"] == "Dior Me"
+    assert received_parameters["gender"] == "Women"
+    assert received_parameters["note"] == "Cherry"
+    assert received_parameters["min_rating"] == 3.5
+    assert received_parameters["year_from"] == 2000
+    assert received_parameters["year_to"] == 2010
 
 def test_get_fragrance_by_id(monkeypatch):
     monkeypatch.setattr(

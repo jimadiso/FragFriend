@@ -32,6 +32,7 @@ def search_fragrances(
     country: str = None,
     gender: str = None,
     accord: str = None,
+    note: str = None,
     sort_by: Literal[
     "rating",
     "popularity",
@@ -86,6 +87,7 @@ def search_fragrances(
         country=country,
         gender=gender,
         accord=accord,
+        note=note,
         sort_by=sort_by,
         min_rating=min_rating,
         max_rating=max_rating,

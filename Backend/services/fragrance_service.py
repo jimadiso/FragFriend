@@ -7,6 +7,7 @@ def search_fragrances(
     country: str = None,
     gender: str = None,
     accord: str = None,
+    note: str = None,
     order: str = 'asc',
     sort_by: str = None,
     min_rating: float = None,
@@ -49,8 +50,8 @@ def search_fragrances(
         params["country"] = f"%{country}%"
 
     if gender:
-        query += " AND gender ILIKE :gender"
-        params["gender"] = f"%{gender}%"
+        query += " AND LOWER(gender) = LOWER(:gender)"
+        params["gender"] = gender
 
 
     if accord:
@@ -64,6 +65,15 @@ def search_fragrances(
             )
         """
         params["accord"] = f"%{accord}%"
+    if note:
+        query += """
+            AND (
+                top_notes ILIKE :note OR
+                middle_notes ILIKE :note OR
+                base_notes ILIKE :note
+            )
+        """
+        params["note"] = f"%{note}%"
     
     if min_rating is not None:
         query += " AND rating_value >= :min_rating"
@@ -95,7 +105,7 @@ def search_fragrances(
             if order.lower() not in ('asc','desc'):
                 order = 'asc'
             
-            query += f" ORDER BY {column} {order.upper()}"
+            query += f" ORDER BY {column} {order.upper()} NULLS LAST"
     
 
     query += " LIMIT :limit OFFSET :offset"
