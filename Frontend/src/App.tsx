@@ -15,6 +15,20 @@ type Fragrance = {
   image_url: string | null
 }
 
+type FragranceDetail = Fragrance & {
+  url: string | null
+  top_notes: string | null
+  middle_notes: string | null
+  base_notes: string | null
+  perfumer1: string | null
+  perfumer2: string | null
+  mainaccord1: string | null
+  mainaccord2: string | null
+  mainaccord3: string | null
+  mainaccord4: string | null
+  mainaccord5: string | null
+}
+
 type BrandResult = {
   brand: string
   fragrance_count: number
@@ -54,6 +68,9 @@ function App() {
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const skipNextSuggestionFetch = useRef(false)
   const searchFormRef = useRef<HTMLFormElement>(null)
+  const [selectedFragrance, setSelectedFragrance] =  useState<FragranceDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
 
   useEffect(() => {
     function handleClickOutside(event: PointerEvent) {
@@ -90,6 +107,30 @@ function App() {
     }
   }, [filtersOpen])
 
+  useEffect(() => {
+    const modalOpen =
+      detailLoading || Boolean(detailError) || Boolean(selectedFragrance)
+
+    if (!modalOpen) {
+      return
+    }
+
+    function handleModalEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        closeFragranceDetails()
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleModalEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleModalEscape)
+    }
+  }, [detailLoading, detailError, selectedFragrance])
+  
   useEffect(() => {
     if (skipNextSuggestionFetch.current) {
       skipNextSuggestionFetch.current = false
@@ -253,6 +294,36 @@ function App() {
       setActiveSuggestionIndex(-1)
     }
   }
+
+  async function openFragranceDetails(id: number) {
+    setDetailLoading(true)
+    setDetailError('')
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/fragrances/${id}`,
+      )
+
+      if (!response.ok) {
+        throw new Error('Unable to load fragrance details.')
+      }
+
+      const fragrance: FragranceDetail = await response.json()
+      setSelectedFragrance(fragrance)
+    } catch {
+      setDetailError(
+        'We could not load this fragrance. Please try again.',
+      )
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  function closeFragranceDetails() {
+    setSelectedFragrance(null)
+    setDetailError('')
+  }
+
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -766,12 +837,149 @@ function App() {
                 : 'Not rated'}
             </p>
 
-            <span className="card-action">
+            <button
+              type="button"
+              className="card-action"
+              onClick={() => openFragranceDetails(fragrance.id)}
+            >
               View more info →
-            </span>
+            </button>
           </article>
         ))}
       </section>
+      {(detailLoading || detailError || selectedFragrance) && (
+        <div
+          className="detail-backdrop"
+          onClick={closeFragranceDetails}
+        >
+          <section
+            className="detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="detail-close"
+              aria-label="Close fragrance details"
+              onClick={closeFragranceDetails}
+            >
+              ×
+            </button>
+
+            {detailLoading && (
+              <p className="detail-status">Loading fragrance details…</p>
+            )}
+
+            {!detailLoading && detailError && (
+              <p className="detail-error">{detailError}</p>
+            )}
+
+            {!detailLoading && selectedFragrance && (
+              <>
+                <div className="detail-image-wrapper">
+                  {selectedFragrance.image_url ? (
+                    <img
+                      src={selectedFragrance.image_url}
+                      alt={`${selectedFragrance.perfume} by ${selectedFragrance.brand}`}
+                    />
+                  ) : (
+                    <div className="detail-image-placeholder">
+                      {selectedFragrance.brand.charAt(0)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="detail-content">
+                  <p className="detail-brand">
+                    {selectedFragrance.brand}
+                  </p>
+
+                  <h2 id="detail-title">
+                    {selectedFragrance.perfume}
+                  </h2>
+
+                  <p className="detail-summary">
+                    {selectedFragrance.year ?? 'Year unknown'} ·{' '}
+                    {selectedFragrance.gender ?? 'Unisex'}
+                  </p>
+
+                  <p className="detail-summary">
+                    Rating:{' '}
+                    {selectedFragrance.rating_value !== null
+                      ? selectedFragrance.rating_value.toFixed(2)
+                      : 'Not rated'}
+                    {selectedFragrance.rating_count !== null &&
+                      ` from ${selectedFragrance.rating_count.toLocaleString()} votes`}
+                  </p>
+
+                  <div className="detail-notes">
+                    <div>
+                      <h3>Top notes</h3>
+                      <p>{selectedFragrance.top_notes || 'Not listed'}</p>
+                    </div>
+
+                    <div>
+                      <h3>Middle notes</h3>
+                      <p>{selectedFragrance.middle_notes || 'Not listed'}</p>
+                    </div>
+
+                    <div>
+                      <h3>Base notes</h3>
+                      <p>{selectedFragrance.base_notes || 'Not listed'}</p>
+                    </div>
+                  </div>
+
+                  <div className="detail-accords">
+                    <h3>Main accords</h3>
+
+                    <div>
+                      {[
+                        selectedFragrance.mainaccord1,
+                        selectedFragrance.mainaccord2,
+                        selectedFragrance.mainaccord3,
+                        selectedFragrance.mainaccord4,
+                        selectedFragrance.mainaccord5,
+                      ]
+                        .filter(
+                          (accord): accord is string => Boolean(accord),
+                        )
+                        .map((accord) => (
+                          <span key={accord}>{accord}</span>
+                        ))}
+                    </div>
+                  </div>
+
+                  {(selectedFragrance.perfumer1 ||
+                    selectedFragrance.perfumer2) && (
+                    <p className="detail-perfumer">
+                      Perfumer:{' '}
+                      {[
+                        selectedFragrance.perfumer1,
+                        selectedFragrance.perfumer2,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </p>
+                  )}
+
+                  {selectedFragrance.url && (
+                    <a
+                      className="detail-source"
+                      href={selectedFragrance.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View original listing →
+                    </a>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </main>
   )
 }

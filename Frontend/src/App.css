@@ -671,3 +671,248 @@
   color: #81756e;
   font-size: 0.86rem;
 }
+
+.fragrance-card button.card-action {
+  appearance: none;
+  align-self: flex-start;
+  width: auto;
+  margin-top: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #986c50;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+  color 160ms ease,
+  background-color 160ms ease;
+}
+
+.fragrance-card button.card-action:hover {
+  color: #c99a7b;
+}
+
+.fragrance-card button.card-action:focus-visible {
+  color: #d6ad93;
+  outline: 2px solid #c99a7b;
+  outline-offset: 3px;
+}
+
+.detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  overflow-y: auto;
+  background: rgba(45, 37, 32, 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.detail-modal {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(320px, 1.2fr);
+  gap: 36px;
+  width: min(980px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  padding: 38px;
+  overflow-y: auto;
+  border: 1px solid rgba(91, 70, 56, 0.15);
+  border-radius: 26px;
+  color: #2d2520;
+  background: #fffaf5;
+  box-shadow: 0 30px 90px rgba(45, 37, 32, 0.28);
+  text-align: left;
+}
+
+.detail-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(91, 70, 56, 0.18);
+  border-radius: 50%;
+  color: #49382e;
+  background: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.detail-close:hover {
+  color: #fff;
+  background: #49382e;
+}
+
+.detail-image-wrapper {
+  display: grid;
+  min-height: 420px;
+  padding: 24px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #f5eee8;
+}
+
+.detail-image-wrapper img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 470px;
+  object-fit: contain;
+}
+
+.detail-image-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 370px;
+  place-items: center;
+  color: #c9a58e;
+  background:
+    radial-gradient(circle at top, #fffaf5, transparent 65%),
+    linear-gradient(145deg, #f1e5dc, #faf5f0);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 7rem;
+  font-style: italic;
+}
+
+.detail-content {
+  padding: 10px 18px 10px 0;
+}
+
+.detail-brand {
+  margin: 0 0 10px;
+  color: #986c50;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.detail-content h2 {
+  margin: 0 48px 18px 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.detail-summary {
+  margin: 7px 0;
+  color: #756b64;
+}
+
+.detail-notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.detail-notes > div {
+  padding: 14px;
+  border-radius: 12px;
+  background: #f5eee8;
+}
+
+.detail-notes h3,
+.detail-accords h3 {
+  margin: 0 0 8px;
+  color: #49382e;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detail-notes p {
+  margin: 0;
+  color: #756b64;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.detail-accords {
+  margin-top: 24px;
+}
+
+.detail-accords > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-accords span {
+  padding: 7px 11px;
+  border-radius: 999px;
+  color: #6f4934;
+  background: #ead8cc;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.detail-perfumer {
+  margin: 24px 0 0;
+  color: #756b64;
+}
+
+.detail-source {
+  display: inline-block;
+  margin-top: 22px;
+  color: #986c50;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.detail-source:hover {
+  color: #c99a7b;
+}
+
+.detail-status,
+.detail-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 80px 30px;
+  text-align: center;
+}
+
+.detail-error {
+  color: #a13d35;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .detail-backdrop {
+    padding: 12px;
+  }
+
+  .detail-modal {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 24px;
+  }
+
+  .detail-image-wrapper {
+    min-height: 300px;
+    margin-top: 30px;
+  }
+
+  .detail-content {
+    padding: 0;
+  }
+
+  .detail-notes {
+    grid-template-columns: 1fr;
+  }
+}
