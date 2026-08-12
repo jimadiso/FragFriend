@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, type SyntheticEvent,} from 'react'
+import {useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent,} from 'react'
 import './App.css'
 
 type SearchMode = 'brand' | 'name'
@@ -21,6 +21,13 @@ type BrandResult = {
   average_rating: number | null
 }
 
+type SearchSuggestion = {
+  id: string
+  value: string
+  title: string
+  subtitle: string
+}
+
 function App() {
   const [searchMode, setSearchMode] = useState<SearchMode>('brand')
   const [query, setQuery] = useState('')
@@ -39,9 +46,14 @@ function App() {
   const [accord, setAccord] = useState('')
   const [note, setNote] = useState('')
   const activeFilterCount = [minRating, maxRating, yearFrom, yearTo, gender, accord, note,].filter(Boolean).length
-
   const [brands, setBrands] = useState<BrandResult[]>([])
   const [selectedBrand, setSelectedBrand] = useState('')
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
+  const skipNextSuggestionFetch = useRef(false)
+  const searchFormRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     function handleClickOutside(event: PointerEvent) {
@@ -78,6 +90,106 @@ function App() {
     }
   }, [filtersOpen])
 
+  useEffect(() => {
+    if (skipNextSuggestionFetch.current) {
+      skipNextSuggestionFetch.current = false
+      return
+    }
+
+    const trimmedQuery = query.trim()
+
+    if (trimmedQuery.length < 2) {
+      setSuggestions([])
+      setSuggestionsOpen(false)
+      setSuggestionsLoading(false)
+      setActiveSuggestionIndex(-1)
+      return
+    }
+
+    const controller = new AbortController()
+
+    const timer = window.setTimeout(async () => {
+      setSuggestionsLoading(true)
+      setSuggestionsOpen(true)
+
+      try {
+        if (searchMode === 'brand') {
+          const parameters = new URLSearchParams({
+            name: trimmedQuery,
+            limit: '6',
+            offset: '0',
+          })
+
+          const response = await fetch(
+            `http://127.0.0.1:8000/fragrances/brands/search?${parameters}`,
+            { signal: controller.signal },
+          )
+
+          if (!response.ok) {
+            throw new Error('Brand suggestions failed.')
+          }
+
+          const data: BrandResult[] = await response.json()
+
+          setSuggestions(
+            data.map((brand) => ({
+              id: `brand-${brand.brand.toLowerCase()}`,
+              value: brand.brand,
+              title: brand.brand,
+              subtitle: `${brand.fragrance_count} fragrances`,
+            })),
+          )
+        } else {
+          const parameters = new URLSearchParams({
+            name: trimmedQuery,
+            limit: '6',
+            offset: '0',
+            sort_by: 'popularity',
+            order: 'desc',
+          })
+
+          const response = await fetch(
+            `http://127.0.0.1:8000/fragrances/search?${parameters}`,
+            { signal: controller.signal },
+          )
+
+          if (!response.ok) {
+            throw new Error('Fragrance suggestions failed.')
+          }
+
+          const data: Fragrance[] = await response.json()
+
+          setSuggestions(
+            data.map((fragrance) => ({
+              id: `fragrance-${fragrance.id}`,
+              value: fragrance.perfume,
+              title: fragrance.perfume,
+              subtitle: fragrance.brand,
+            })),
+          )
+        }
+
+        setActiveSuggestionIndex(-1)
+      } catch (requestError) {
+        if (
+          requestError instanceof Error &&
+          requestError.name !== 'AbortError'
+        ) {
+          setSuggestions([])
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setSuggestionsLoading(false)
+        }
+      }
+    }, 300)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [query, searchMode])
+
     const showingBrandResults =
     searchMode === 'brand' && !selectedBrand
 
@@ -87,6 +199,60 @@ function App() {
         ? brands.length === 0
         : fragrances.length === 0)
 
+  function selectSuggestion(suggestion: SearchSuggestion) {
+    skipNextSuggestionFetch.current = true
+
+    setQuery(suggestion.value)
+    setSuggestions([])
+    setSuggestionsOpen(false)
+    setActiveSuggestionIndex(-1)
+
+    window.setTimeout(() => {
+      searchFormRef.current?.requestSubmit()
+    }, 0)
+  }
+
+  function handleSuggestionKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ) {
+    if (!suggestionsOpen || suggestions.length === 0) {
+      if (event.key === 'ArrowDown' && suggestions.length > 0) {
+        setSuggestionsOpen(true)
+      }
+
+      return
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+
+      setActiveSuggestionIndex((currentIndex) =>
+        currentIndex >= suggestions.length - 1
+          ? 0
+          : currentIndex + 1,
+      )
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+
+      setActiveSuggestionIndex((currentIndex) =>
+        currentIndex <= 0
+          ? suggestions.length - 1
+          : currentIndex - 1,
+      )
+    }
+
+    if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+      event.preventDefault()
+      selectSuggestion(suggestions[activeSuggestionIndex])
+    }
+
+    if (event.key === 'Escape') {
+      setSuggestionsOpen(false)
+      setActiveSuggestionIndex(-1)
+    }
+  }
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -239,6 +405,9 @@ function App() {
     setHasSearched(false)
     setBrands([])
     setSelectedBrand('')
+    setSuggestions([])
+    setSuggestionsOpen(false)
+    setActiveSuggestionIndex(-1)
   }
 
   function clearFilters() {
@@ -261,7 +430,7 @@ function App() {
           Search the fragrance collection by{' '}{searchMode === 'brand' ? 'brand' : 'fragrance'} name.
         </p>
 
-        <form className="search-form" onSubmit={handleSubmit}>
+        <form ref={searchFormRef} className="search-form" onSubmit={handleSubmit}>
           <div className="search-label-row">
             <div className="search-modifier" aria-label="Search type">
               <button
@@ -305,17 +474,66 @@ function App() {
         </div>
 
           <div className="search-controls">
-            <input
-              id="fragrance-search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={
-                searchMode === 'brand'
-                  ? 'Try Dior, Chanel, or Gucci'
-                  : 'Try Dior Me Dior Me Not'
-              }
-            />
+            <div className="search-input-wrapper">
+              <input
+                id="fragrance-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleSuggestionKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0 || suggestionsLoading) {
+                    setSuggestionsOpen(true)
+                  }
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => setSuggestionsOpen(false), 150)
+                }}
+                placeholder={
+                  searchMode === 'brand'
+                    ? 'Try Dior, Chanel, or Gucci'
+                    : 'Try Sauvage, Eros, or Most Wanted'
+                }
+                autoComplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={suggestionsOpen}
+                aria-controls="search-suggestions"
+              />
+
+              {suggestionsOpen && (
+                <div
+                  id="search-suggestions"
+                  className="search-suggestions"
+                  role="listbox"
+                >
+                  {suggestionsLoading ? (
+                    <p className="suggestion-status">Finding matches…</p>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((suggestion, index) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        role="option"
+                        aria-selected={index === activeSuggestionIndex}
+                        className={
+                          index === activeSuggestionIndex
+                            ? 'search-suggestion active'
+                            : 'search-suggestion'
+                        }
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectSuggestion(suggestion)}
+                      >
+                        <span>{suggestion.title}</span>
+                        <small>{suggestion.subtitle}</small>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="suggestion-status">No matching suggestions</p>
+                  )}
+                </div>
+              )}
+            </div>
 
             <button type="submit" disabled={loading}>
               {loading ? 'Searching...' : 'Search'}
