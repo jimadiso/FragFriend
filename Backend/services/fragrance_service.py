@@ -152,6 +152,94 @@ def search_fragrances(
         result = conn.execute(text(query), params)
         return [dict(row._mapping) for row in result]
 
+def count_fragrances(
+    name: str = None,
+    brand: str = None,
+    country: str = None,
+    gender: str = None,
+    accord: str = None,
+    note: str = None,
+    min_rating: float = None,
+    max_rating: float = None,
+    year_from: int = None,
+    year_to: int = None,
+    min_vote: int = None,
+    max_vote: int = None,
+):
+    query = """
+        SELECT COUNT(*) AS total
+        FROM fragrances
+        WHERE 1=1
+    """
+
+    params = {}
+
+    if name:
+        query += " AND perfume ILIKE :name"
+        params["name"] = f"%{name}%"
+
+    if brand:
+        query += " AND brand ILIKE :brand"
+        params["brand"] = f"%{brand}%"
+
+    if country:
+        query += " AND country ILIKE :country"
+        params["country"] = f"%{country}%"
+
+    if gender:
+        query += " AND LOWER(gender) = LOWER(:gender)"
+        params["gender"] = gender
+
+    if accord:
+        query += """
+            AND (
+                mainaccord1 ILIKE :accord OR
+                mainaccord2 ILIKE :accord OR
+                mainaccord3 ILIKE :accord OR
+                mainaccord4 ILIKE :accord OR
+                mainaccord5 ILIKE :accord
+            )
+        """
+        params["accord"] = f"%{accord}%"
+
+    if note:
+        query += """
+            AND (
+                top_notes ILIKE :note OR
+                middle_notes ILIKE :note OR
+                base_notes ILIKE :note
+            )
+        """
+        params["note"] = f"%{note}%"
+
+    if min_rating is not None:
+        query += " AND rating_value >= :min_rating"
+        params["min_rating"] = min_rating
+
+    if max_rating is not None:
+        query += " AND rating_value <= :max_rating"
+        params["max_rating"] = max_rating
+
+    if year_from is not None:
+        query += " AND year >= :year_from"
+        params["year_from"] = year_from
+
+    if year_to is not None:
+        query += " AND year <= :year_to"
+        params["year_to"] = year_to
+
+    if min_vote is not None:
+        query += " AND rating_count >= :min_vote"
+        params["min_vote"] = min_vote
+
+    if max_vote is not None:
+        query += " AND rating_count <= :max_vote"
+        params["max_vote"] = max_vote
+
+    with engine.connect() as conn:
+        total = conn.execute(text(query), params).scalar_one()
+        return {"total": total}
+
 def get_fragrance_by_id(fragrance_id: int):
     with engine.connect() as conn:
         result = conn.execute(

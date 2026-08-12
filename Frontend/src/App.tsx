@@ -3,6 +3,14 @@ import './App.css'
 
 type SearchMode = 'brand' | 'name'
 
+type SortOption =
+  | 'rating-desc'
+  | 'rating-asc'
+  | 'year-desc'
+  | 'year-asc'
+  | 'popularity-desc'
+  | 'popularity-asc'
+
 type Fragrance = {
   id: number
   perfume: string
@@ -46,6 +54,13 @@ function App() {
   const [searchMode, setSearchMode] = useState<SearchMode>('brand')
   const [query, setQuery] = useState('')
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
+  const [sortOption, setSortOption] = useState<SortOption>('rating-desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
+  const [hasNextPage, setHasNextPage] = useState(false)
+  const [totalResults, setTotalResults] = useState(0)
+  const pageSize = 8
+  const totalPages = Math.max(1, Math.ceil(totalResults / pageSize),)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
@@ -324,6 +339,100 @@ function App() {
     setDetailError('')
   }
 
+  function getSortParameters(option: SortOption) {
+    const [sortBy, order] = option.split('-') as [
+      'rating' | 'year' | 'popularity',
+      'asc' | 'desc',
+    ]
+
+    return {
+      sortBy,
+      order,
+    }
+  }
+
+  async function loadFragrancePage(
+    pageNumber: number,
+    brandName = selectedBrand,
+    requestedSort = sortOption,
+  ) {
+    setLoading(true)
+    setError('')
+
+    const trimmedQuery = query.trim()
+    const { sortBy, order } = getSortParameters(requestedSort)
+
+    try {
+      const parameters = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String((pageNumber - 1) * pageSize),
+        sort_by: sortBy,
+        order,
+      })
+
+      if (brandName) {
+        parameters.set('brand', brandName)
+      } else if (trimmedQuery) {
+        parameters.set('name', trimmedQuery)
+      }
+
+      if (minRating) parameters.set('min_rating', minRating)
+      if (maxRating) parameters.set('max_rating', maxRating)
+      if (yearFrom) parameters.set('year_from', yearFrom)
+      if (yearTo) parameters.set('year_to', yearTo)
+      if (gender) parameters.set('gender', gender)
+      if (accord.trim()) parameters.set('accord', accord.trim())
+      if (note.trim()) parameters.set('note', note.trim())
+
+      const countParameters = new URLSearchParams(parameters)
+      countParameters.delete('limit')
+      countParameters.delete('offset')
+      countParameters.delete('sort_by')
+      countParameters.delete('order')
+
+      const [response, countResponse] = await Promise.all([
+        fetch(
+          `http://127.0.0.1:8000/fragrances/search?${parameters}`,
+        ),
+        fetch(
+          `http://127.0.0.1:8000/fragrances/search/count?${countParameters}`,
+        ),
+      ])
+
+      if (!response.ok || !countResponse.ok) {
+        throw new Error('The fragrance search failed.')
+      }
+
+      const [data, countData]: [
+        Fragrance[],
+        { total: number },
+      ] = await Promise.all([
+        response.json(),
+        countResponse.json(),
+      ])
+
+      setFragrances(data)
+      setTotalResults(countData.total)
+      setHasNextPage(pageNumber < Math.ceil(countData.total / pageSize))
+      setCurrentPage(pageNumber)
+      setPageInput(String(pageNumber))
+      setHasSearched(true)
+
+      return true
+    } catch {
+      setError(
+        'Could not connect to the FragFriend API. Make sure the backend is running.',
+      )
+      setFragrances([])
+      setHasNextPage(false)
+      setTotalResults(0)
+
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -382,38 +491,13 @@ function App() {
         setBrands(data)
         setFragrances([])
         setSelectedBrand('')
+        setCurrentPage(1)
+        setHasNextPage(false)
+        setTotalResults(0)
         return
       }
 
-      const parameters = new URLSearchParams({
-        limit: '10',
-        offset: '0',
-        sort_by: 'rating',
-        order: 'desc',
-      })
-
-      if (trimmedQuery) {
-        parameters.set(searchMode, trimmedQuery)
-      }
-
-      if (minRating) parameters.set('min_rating', minRating)
-      if (maxRating) parameters.set('max_rating', maxRating)
-      if (yearFrom) parameters.set('year_from', yearFrom)
-      if (yearTo) parameters.set('year_to', yearTo)
-      if (gender) parameters.set('gender', gender)
-      if (accord.trim()) parameters.set('accord', accord.trim())
-      if (note.trim()) parameters.set('note', note.trim())
-
-      const response = await fetch(
-        `http://127.0.0.1:8000/fragrances/search?${parameters}`,
-      )
-
-      if (!response.ok) {
-        throw new Error('The fragrance search failed.')
-      }
-
-      const data: Fragrance[] = await response.json()
-      setFragrances(data)
+      await loadFragrancePage(1, '', sortOption)
     } catch {
       setError(
         'Could not connect to the FragFriend API. Make sure the backend is running.',
@@ -425,48 +509,65 @@ function App() {
   }
 
   async function openBrand(brandName: string) {
-    setLoading(true)
-    setError('')
+    setSelectedBrand(brandName)
+    setBrands([])
 
-    try {
-      const parameters = new URLSearchParams({
-        brand: brandName,
-        limit: '8',
-        offset: '0',
-        sort_by: 'rating',
-        order: 'desc',
-      })
+    const loaded = await loadFragrancePage(
+      1,
+      brandName,
+      sortOption,
+    )
 
-      if (minRating) parameters.set('min_rating', minRating)
-      if (maxRating) parameters.set('max_rating', maxRating)
-      if (yearFrom) parameters.set('year_from', yearFrom)
-      if (yearTo) parameters.set('year_to', yearTo)
-      if (gender) parameters.set('gender', gender)
-      if (accord.trim()) parameters.set('accord', accord.trim())
-      if (note.trim()) parameters.set('note', note.trim())
-
-      const response = await fetch(
-        `http://127.0.0.1:8000/fragrances/search?${parameters}`,
-      )
-
-      if (!response.ok) {
-        throw new Error('Could not load the brand.')
-      }
-
-      const data: Fragrance[] = await response.json()
-
-      setSelectedBrand(brandName)
-      setFragrances(data)
-      setBrands([])
-      setHasSearched(true)
-    } catch {
-      setError('Could not load fragrances from this brand.')
-    } finally {
-      setLoading(false)
+    if (!loaded) {
+      setSelectedBrand('')
     }
   }
 
+  async function changeSort(nextSort: SortOption) {
+    setSortOption(nextSort)
 
+    await loadFragrancePage(
+      1,
+      selectedBrand,
+      nextSort,
+    )
+  }
+
+  async function changePage(nextPage: number) {
+    if (nextPage < 1 || loading) {
+      return
+    }
+
+    await loadFragrancePage(
+      nextPage,
+      selectedBrand,
+      sortOption,
+    )
+
+    document
+      .querySelector('.results-toolbar')
+      ?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+  }
+
+  function submitPageJump() {
+    const requestedPage = Number(pageInput)
+
+    if (
+      !Number.isInteger(requestedPage) ||
+      requestedPage < 1 ||
+      requestedPage > totalPages
+    ) {
+      setPageInput(String(currentPage))
+      return
+    }
+
+    if (requestedPage !== currentPage) {
+      void changePage(requestedPage)
+    }
+  }
 
   function changeSearchMode(mode: SearchMode) {
     setSearchMode(mode)
@@ -476,6 +577,9 @@ function App() {
     setHasSearched(false)
     setBrands([])
     setSelectedBrand('')
+    setCurrentPage(1)
+    setHasNextPage(false)
+    setTotalResults(0)
     setSuggestions([])
     setSuggestionsOpen(false)
     setActiveSuggestionIndex(-1)
@@ -807,6 +911,58 @@ function App() {
             </button>
           ))}
 
+        {(searchMode === 'name' || selectedBrand) &&
+          fragrances.length > 0 && (
+            <div className="results-toolbar">
+              <div>
+                <p className="results-label">
+                  {selectedBrand
+                    ? `${selectedBrand} fragrances`
+                    : 'Fragrance results'}
+                </p>
+
+                <p className="results-page">
+                  Page {currentPage} of {totalPages} ·{' '}
+                  {totalResults.toLocaleString()}{' '}
+                  {totalResults === 1 ? 'fragrance' : 'fragrances'}
+                </p>
+              </div>
+
+              <label className="sort-control">
+                <span>Sort by</span>
+
+                <select
+                  value={sortOption}
+                  disabled={loading}
+                  onChange={(event) =>
+                    void changeSort(
+                      event.target.value as SortOption,
+                    )
+                  }
+                >
+                  <option value="rating-desc">
+                    Highest rating
+                  </option>
+                  <option value="rating-asc">
+                    Lowest rating
+                  </option>
+                  <option value="year-desc">
+                    Newest year
+                  </option>
+                  <option value="year-asc">
+                    Oldest year
+                  </option>
+                  <option value="popularity-desc">
+                    Most reviewed
+                  </option>
+                  <option value="popularity-asc">
+                    Least reviewed
+                  </option>
+                </select>
+              </label>
+            </div>
+          )}
+
         {(searchMode === 'name' || selectedBrand) && fragrances.map((fragrance) => (
           <article className="fragrance-card" key={fragrance.id}>
             <div className="fragrance-image-wrapper">
@@ -846,6 +1002,70 @@ function App() {
             </button>
           </article>
         ))}
+
+        {(searchMode === 'name' || selectedBrand) &&
+          fragrances.length > 0 && (
+            <nav
+              className="pagination"
+              aria-label="Fragrance result pages"
+            >
+              <button
+                type="button"
+                disabled={loading || currentPage === 1}
+                onClick={() =>
+                  void changePage(currentPage - 1)
+                }
+              >
+                ← Previous
+              </button>
+
+              <div className="page-jump">
+                <label htmlFor="page-number" className="sr-only">
+                  Go to page
+                </label>
+
+                <input
+                  id="page-number"
+                  type="text"
+                  inputMode="numeric"
+                  value={pageInput}
+                  disabled={loading}
+                  aria-label={`Current page, ${currentPage} of ${totalPages}`}
+                  onChange={(event) => {
+                    const nextValue = event.target.value
+
+                    if (/^\d*$/.test(nextValue)) {
+                      setPageInput(nextValue)
+                    }
+                  }}
+                  onBlur={submitPageJump}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      submitPageJump()
+                    }
+
+                    if (event.key === 'Escape') {
+                      setPageInput(String(currentPage))
+                      event.currentTarget.blur()
+                    }
+                  }}
+                />
+
+                <span aria-hidden="true">/ {totalPages}</span>
+              </div>
+
+              <button
+                type="button"
+                disabled={loading || !hasNextPage}
+                onClick={() =>
+                  void changePage(currentPage + 1)
+                }
+              >
+                Next →
+              </button>
+            </nav>
+          )}
       </section>
       {(detailLoading || detailError || selectedFragrance) && (
         <div

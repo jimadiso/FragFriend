@@ -27,6 +27,10 @@ class BrandSearchResult(BaseModel):
     average_rating: float | None = None
 
 
+class FragranceCountResult(BaseModel):
+    total: int
+
+
 class FragranceDetail(FragranceSearchResult):
     url: str
     top_notes: str
