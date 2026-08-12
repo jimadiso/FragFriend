@@ -12,6 +12,13 @@ type Fragrance = {
   rating_value: number | null
   rating_count: number | null
   year: number | null
+  image_url: string | null
+}
+
+type BrandResult = {
+  brand: string
+  fragrance_count: number
+  average_rating: number | null
 }
 
 function App() {
@@ -32,6 +39,9 @@ function App() {
   const [accord, setAccord] = useState('')
   const [note, setNote] = useState('')
   const activeFilterCount = [minRating, maxRating, yearFrom, yearTo, gender, accord, note,].filter(Boolean).length
+
+  const [brands, setBrands] = useState<BrandResult[]>([])
+  const [selectedBrand, setSelectedBrand] = useState('')
 
   useEffect(() => {
     function handleClickOutside(event: PointerEvent) {
@@ -60,11 +70,22 @@ function App() {
       document.addEventListener('keydown', handleEscape)
     }
 
+
+
     return () => {
       document.removeEventListener('pointerdown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
     }
   }, [filtersOpen])
+
+    const showingBrandResults =
+    searchMode === 'brand' && !selectedBrand
+
+    const hasNoResults =
+      hasSearched &&
+      (showingBrandResults
+        ? brands.length === 0
+        : fragrances.length === 0)
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -101,6 +122,32 @@ function App() {
     setFiltersOpen(false)
 
     try {
+      if (searchMode === 'brand') {
+        const brandParameters = new URLSearchParams({
+          limit: '8',
+          offset: '0',
+        })
+
+        if (trimmedQuery) {
+          brandParameters.set('name', trimmedQuery)
+        }
+
+        const response = await fetch(
+          `http://127.0.0.1:8000/fragrances/brands/search?${brandParameters}`,
+        )
+
+        if (!response.ok) {
+          throw new Error('The brand search failed.')
+        }
+
+        const data: BrandResult[] = await response.json()
+
+        setBrands(data)
+        setFragrances([])
+        setSelectedBrand('')
+        return
+      }
+
       const parameters = new URLSearchParams({
         limit: '10',
         offset: '0',
@@ -140,12 +187,58 @@ function App() {
     }
   }
 
+  async function openBrand(brandName: string) {
+    setLoading(true)
+    setError('')
+
+    try {
+      const parameters = new URLSearchParams({
+        brand: brandName,
+        limit: '8',
+        offset: '0',
+        sort_by: 'rating',
+        order: 'desc',
+      })
+
+      if (minRating) parameters.set('min_rating', minRating)
+      if (maxRating) parameters.set('max_rating', maxRating)
+      if (yearFrom) parameters.set('year_from', yearFrom)
+      if (yearTo) parameters.set('year_to', yearTo)
+      if (gender) parameters.set('gender', gender)
+      if (accord.trim()) parameters.set('accord', accord.trim())
+      if (note.trim()) parameters.set('note', note.trim())
+
+      const response = await fetch(
+        `http://127.0.0.1:8000/fragrances/search?${parameters}`,
+      )
+
+      if (!response.ok) {
+        throw new Error('Could not load the brand.')
+      }
+
+      const data: Fragrance[] = await response.json()
+
+      setSelectedBrand(brandName)
+      setFragrances(data)
+      setBrands([])
+      setHasSearched(true)
+    } catch {
+      setError('Could not load fragrances from this brand.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+
   function changeSearchMode(mode: SearchMode) {
     setSearchMode(mode)
     setQuery('')
     setFragrances([])
     setError('')
     setHasSearched(false)
+    setBrands([])
+    setSelectedBrand('')
   }
 
   function clearFilters() {
@@ -382,18 +475,66 @@ function App() {
           <p>Your search results will appear here.</p>
         )}
 
-        {!loading && hasSearched && fragrances.length === 0 && !error && (
+        {!loading && hasNoResults && !error && (
           <div className="no-results">
-            <h2>No matching fragrances found</h2>
+            <h2>
+              {showingBrandResults
+                ? 'No matching brands found'
+                : 'No matching fragrances found'}
+            </h2>
+
             <p>
-              We couldn&apos;t find any fragrances from “{query.trim()}”. Check the
-              spelling or try another{' '}{searchMode === 'brand' ? 'brand' : 'fragrance'}.
+              We couldn&apos;t find any{' '}
+              {showingBrandResults ? 'brands' : 'fragrances'} matching “
+              {query.trim()}”. Check the spelling and try again.
             </p>
           </div>
         )}
 
-        {fragrances.map((fragrance) => (
+        {searchMode === 'brand' &&
+          !selectedBrand &&
+          brands.map((brand) => (
+            <button
+              type="button"
+              className="brand-card"
+              key={brand.brand}
+              onClick={() => openBrand(brand.brand)}
+            >
+              <p className="brand-card-label">Brand</p>
+              <h2>{brand.brand}</h2>
+              <p>
+                {brand.fragrance_count}{' '}
+                {brand.fragrance_count === 1 ? 'fragrance' : 'fragrances'}
+              </p>
+              <p>
+                Average rating:{' '}
+                {brand.average_rating !== null
+                  ? brand.average_rating.toFixed(2)
+                  : 'Not rated'}
+              </p>
+              <span className="card-action">
+                View fragrances →
+              </span>
+            </button>
+          ))}
+
+        {(searchMode === 'name' || selectedBrand) && fragrances.map((fragrance) => (
           <article className="fragrance-card" key={fragrance.id}>
+            <div className="fragrance-image-wrapper">
+              {fragrance.image_url ? (
+                <img
+                  className="fragrance-image"
+                  src={fragrance.image_url}
+                  alt={`${fragrance.perfume} by ${fragrance.brand}`}
+                  loading="lazy"
+                />
+              ) : (
+                <div className="fragrance-image-placeholder">
+                  <span>{fragrance.brand.charAt(0)}</span>
+                </div>
+              )}
+            </div>
+
             <p className="brand">{fragrance.brand}</p>
             <h2>{fragrance.perfume}</h2>
             <p>
@@ -406,6 +547,10 @@ function App() {
                 ? fragrance.rating_value.toFixed(2)
                 : 'Not rated'}
             </p>
+
+            <span className="card-action">
+              View more info →
+            </span>
           </article>
         ))}
       </section>

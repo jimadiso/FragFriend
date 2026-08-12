@@ -1,6 +1,44 @@
 from sqlalchemy import text
 from Backend.database import engine
 
+
+def search_brands(
+    name: str = None,
+    limit: int = 8,
+    offset: int = 0,
+):
+    query = """
+        SELECT
+            MIN(brand) AS brand,
+            COUNT(*) AS fragrance_count,
+            ROUND(AVG(rating_value)::numeric, 2)::float
+                AS average_rating
+        FROM fragrances
+        WHERE brand IS NOT NULL
+          AND TRIM(brand) != ''
+    """
+
+    params = {
+        "limit": limit,
+        "offset": offset,
+    }
+
+    if name:
+        query += " AND brand ILIKE :name"
+        params["name"] = f"%{name}%"
+
+    query += """
+        GROUP BY LOWER(brand)
+        ORDER BY fragrance_count DESC, MIN(brand) ASC
+        LIMIT :limit
+        OFFSET :offset
+    """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query), params)
+        return [dict(row._mapping) for row in result]
+
+
 def search_fragrances(
     name: str = None,
     brand: str = None,
@@ -20,7 +58,7 @@ def search_fragrances(
     offset: int = 0
 ):
     query = """
-        SELECT id, perfume, brand, country, gender, rating_value, rating_count, year,
+        SELECT id, perfume, brand, country, gender, rating_value, rating_count, year, image_url,
                mainaccord1, mainaccord2, mainaccord3, mainaccord4, mainaccord5
         FROM fragrances
         WHERE 1=1
@@ -136,7 +174,7 @@ def get_fragrances(limit: int = 20, offset: int = 0):
     with engine.connect() as conn:
         result = conn.execute(
             text("""
-                SELECT id, perfume, brand, country, gender,
+                SELECT id, perfume, brand, country, gender, image_url,
                        rating_value, rating_count, year
                 FROM fragrances
                 LIMIT :limit

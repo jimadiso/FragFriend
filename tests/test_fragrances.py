@@ -16,6 +16,7 @@ SUMMARY = {
     "rating_value": 3.7,
     "rating_count": 271,
     "year": 2004,
+    "image_url": None,
 }
 
 SEARCH_RESULT = {
@@ -170,3 +171,24 @@ def test_cors_rejects_unknown_origin():
 
     assert response.status_code == 400
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_search_brands(monkeypatch):
+    brand_result = {
+        "brand": "Dior",
+        "fragrance_count": 196,
+        "average_rating": 4.12,
+    }
+
+    monkeypatch.setattr(
+        fragrance_service,
+        "search_brands",
+        lambda name, limit, offset: [brand_result],
+    )
+
+    response = client.get(
+        "/fragrances/brands/search?name=Dior&limit=8&offset=0"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [brand_result]

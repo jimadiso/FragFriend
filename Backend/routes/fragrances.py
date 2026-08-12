@@ -6,6 +6,7 @@ from Backend.models.fragrance import (
     FragranceDetail,
     FragranceSearchResult,
     FragranceSummary,
+    BrandSearchResult,
 )
 from Backend.services import fragrance_service
 
@@ -24,6 +25,18 @@ def get_fragrances(
         offset=offset
     )
 
+
+@router.get("/brands/search", response_model=list[BrandSearchResult])
+def search_brands(
+    name: str | None = None,
+    limit: int = Query(8, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+):
+    return fragrance_service.search_brands(
+        name=name,
+        limit=limit,
+        offset=offset,
+    )
 
 @router.get("/search", response_model=list[FragranceSearchResult])
 def search_fragrances(
