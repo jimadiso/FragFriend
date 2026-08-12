@@ -61,6 +61,8 @@ df["rating_value"] = (
 
 df["year"] = df["year"].astype("Int64")
 df["rating_count"] = df["rating_count"].astype("Int64")
+df["image_url"] = None
+
 
 df.to_sql(
     "fragrances",
