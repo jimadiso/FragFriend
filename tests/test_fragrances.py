@@ -95,6 +95,42 @@ def test_search_fragrances(monkeypatch):
     assert received_parameters["year_from"] == 2000
     assert received_parameters["year_to"] == 2010
 
+def test_count_fragrances(monkeypatch):
+    received_parameters = {}
+
+    def fake_count(**kwargs):
+        received_parameters.update(kwargs)
+        return {"total": 89}
+
+    monkeypatch.setattr(
+        fragrance_service,
+        "count_fragrances",
+        fake_count,
+    )
+
+    response = client.get(
+        "/fragrances/search/count"
+        "?name=Dior"
+        "&gender=Women"
+        "&note=Cherry"
+        "&accord=Floral"
+        "&min_rating=3.5"
+        "&max_rating=5"
+        "&year_from=2000"
+        "&year_to=2020"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"total": 89}
+    assert received_parameters["name"] == "Dior"
+    assert received_parameters["gender"] == "Women"
+    assert received_parameters["note"] == "Cherry"
+    assert received_parameters["accord"] == "Floral"
+    assert received_parameters["min_rating"] == 3.5
+    assert received_parameters["max_rating"] == 5
+    assert received_parameters["year_from"] == 2000
+    assert received_parameters["year_to"] == 2020
+
 def test_get_fragrance_by_id(monkeypatch):
     monkeypatch.setattr(
         fragrance_service,
@@ -136,6 +172,12 @@ def test_missing_fragrance_returns_404(monkeypatch):
         "/fragrances/search?min_vote=10&max_vote=2",
         "/fragrances/search?order=random",
         "/fragrances/search?sort_by=unsupported",
+        "/fragrances/search/count?min_rating=-1",
+        "/fragrances/search/count?max_rating=6",
+        "/fragrances/search/count?min_rating=4&max_rating=2",
+        "/fragrances/search/count?year_from=2020&year_to=1990",
+        "/fragrances/search/count?min_vote=-1",
+        "/fragrances/search/count?min_vote=10&max_vote=2",
     ],
 )
 def test_invalid_parameters_return_422(url):
