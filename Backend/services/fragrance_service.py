@@ -44,8 +44,8 @@ def search_fragrances(
     brand: str = None,
     country: str = None,
     gender: str = None,
-    accord: str = None,
-    note: str = None,
+    accord: list[str] | None = None,
+    note: list[str] | None = None,
     order: str = 'asc',
     sort_by: str = None,
     min_rating: float = None,
@@ -92,26 +92,43 @@ def search_fragrances(
         params["gender"] = gender
 
 
-    if accord:
-        query += """
+    for index, accord_value in enumerate(accord or []):
+        cleaned_accord = accord_value.strip()
+
+        if not cleaned_accord:
+            continue
+
+        parameter_name = f"accord_{index}"
+
+        query += f"""
             AND (
-                mainaccord1 ILIKE :accord OR
-                mainaccord2 ILIKE :accord OR
-                mainaccord3 ILIKE :accord OR
-                mainaccord4 ILIKE :accord OR
-                mainaccord5 ILIKE :accord
+                mainaccord1 ILIKE :{parameter_name} OR
+                mainaccord2 ILIKE :{parameter_name} OR
+                mainaccord3 ILIKE :{parameter_name} OR
+                mainaccord4 ILIKE :{parameter_name} OR
+                mainaccord5 ILIKE :{parameter_name}
             )
         """
-        params["accord"] = f"%{accord}%"
-    if note:
-        query += """
+
+        params[parameter_name] = f"%{cleaned_accord}%"
+
+    for index, note_value in enumerate(note or []):
+        cleaned_note = note_value.strip()
+
+        if not cleaned_note:
+            continue
+
+        parameter_name = f"note_{index}"
+
+        query += f"""
             AND (
-                top_notes ILIKE :note OR
-                middle_notes ILIKE :note OR
-                base_notes ILIKE :note
+                top_notes ILIKE :{parameter_name} OR
+                middle_notes ILIKE :{parameter_name} OR
+                base_notes ILIKE :{parameter_name}
             )
         """
-        params["note"] = f"%{note}%"
+
+        params[parameter_name] = f"%{cleaned_note}%"
     
     if min_rating is not None:
         query += " AND rating_value >= :min_rating"
@@ -157,8 +174,8 @@ def count_fragrances(
     brand: str = None,
     country: str = None,
     gender: str = None,
-    accord: str = None,
-    note: str = None,
+    accord: list[str] | None = None,
+    note: list[str] | None = None,
     min_rating: float = None,
     max_rating: float = None,
     year_from: int = None,
@@ -190,27 +207,43 @@ def count_fragrances(
         query += " AND LOWER(gender) = LOWER(:gender)"
         params["gender"] = gender
 
-    if accord:
-        query += """
-            AND (
-                mainaccord1 ILIKE :accord OR
-                mainaccord2 ILIKE :accord OR
-                mainaccord3 ILIKE :accord OR
-                mainaccord4 ILIKE :accord OR
-                mainaccord5 ILIKE :accord
-            )
-        """
-        params["accord"] = f"%{accord}%"
+    for index, accord_value in enumerate(accord or []):
+        cleaned_accord = accord_value.strip()
 
-    if note:
-        query += """
+        if not cleaned_accord:
+            continue
+
+        parameter_name = f"accord_{index}"
+
+        query += f"""
             AND (
-                top_notes ILIKE :note OR
-                middle_notes ILIKE :note OR
-                base_notes ILIKE :note
+                mainaccord1 ILIKE :{parameter_name} OR
+                mainaccord2 ILIKE :{parameter_name} OR
+                mainaccord3 ILIKE :{parameter_name} OR
+                mainaccord4 ILIKE :{parameter_name} OR
+                mainaccord5 ILIKE :{parameter_name}
             )
         """
-        params["note"] = f"%{note}%"
+
+        params[parameter_name] = f"%{cleaned_accord}%"
+
+    for index, note_value in enumerate(note or []):
+        cleaned_note = note_value.strip()
+
+        if not cleaned_note:
+            continue
+
+        parameter_name = f"note_{index}"
+
+        query += f"""
+            AND (
+                top_notes ILIKE :{parameter_name} OR
+                middle_notes ILIKE :{parameter_name} OR
+                base_notes ILIKE :{parameter_name}
+            )
+        """
+
+        params[parameter_name] = f"%{cleaned_note}%"
 
     if min_rating is not None:
         query += " AND rating_value >= :min_rating"
@@ -239,6 +272,62 @@ def count_fragrances(
     with engine.connect() as conn:
         total = conn.execute(text(query), params).scalar_one()
         return {"total": total}
+
+def get_filter_options(
+    option_type: str,
+    query: str = "",
+    limit: int = 12,
+):
+    params = {
+        "query": f"%{query.strip()}%",
+        "limit": limit,
+    }
+
+    if option_type == "accords":
+        sql = """
+            SELECT value
+            FROM (
+                SELECT TRIM(mainaccord1) AS value FROM fragrances
+                UNION
+                SELECT TRIM(mainaccord2) AS value FROM fragrances
+                UNION
+                SELECT TRIM(mainaccord3) AS value FROM fragrances
+                UNION
+                SELECT TRIM(mainaccord4) AS value FROM fragrances
+                UNION
+                SELECT TRIM(mainaccord5) AS value FROM fragrances
+            ) AS accord_options
+            WHERE value IS NOT NULL
+              AND value != ''
+              AND value ILIKE :query
+            ORDER BY value
+            LIMIT :limit
+        """
+    elif option_type == "notes":
+        sql = """
+            SELECT DISTINCT TRIM(note_value) AS value
+            FROM fragrances
+            CROSS JOIN LATERAL unnest(
+                string_to_array(
+                    concat_ws(',', top_notes, middle_notes, base_notes),
+                    ','
+                )
+            ) AS note_value
+            WHERE TRIM(note_value) != ''
+              AND TRIM(note_value) ILIKE :query
+            ORDER BY value
+            LIMIT :limit
+        """
+    else:
+        return []
+
+    with engine.connect() as conn:
+        result = conn.execute(text(sql), params)
+
+        return [
+            row._mapping["value"]
+            for row in result
+        ]
 
 def get_fragrance_by_id(fragrance_id: int):
     with engine.connect() as conn:

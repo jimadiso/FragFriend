@@ -72,9 +72,16 @@ function App() {
   const [yearFrom, setYearFrom] = useState('')
   const [yearTo, setYearTo] = useState('')
   const [gender, setGender] = useState('')
-  const [accord, setAccord] = useState('')
-  const [note, setNote] = useState('')
-  const activeFilterCount = [minRating, maxRating, yearFrom, yearTo, gender, accord, note,].filter(Boolean).length
+const [accords, setAccords] = useState<string[]>([])
+const [accordInput, setAccordInput] = useState('')
+const [notes, setNotes] = useState<string[]>([])
+const [noteInput, setNoteInput] = useState('')
+const [filterOptionType, setFilterOptionType] = useState<
+  'accords' | 'notes' | null  >(null) 
+const [filterOptions, setFilterOptions] = useState<string[]>([])
+const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
+const activeFilterCount =
+  [minRating, maxRating, yearFrom, yearTo, gender].filter(Boolean).length +   accords.length +  notes.length
   const [brands, setBrands] = useState<BrandResult[]>([])
   const [selectedBrand, setSelectedBrand] = useState('')
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
@@ -245,7 +252,79 @@ function App() {
       controller.abort()
     }
   }, [query, searchMode])
+  useEffect(() => {
+    if (!filterOptionType) {
+      setFilterOptions([])
+      setFilterOptionsLoading(false)
+      return
+    }
 
+    const inputValue =
+      filterOptionType === 'accords'
+        ? accordInput
+        : noteInput
+
+    const selectedValues =
+      filterOptionType === 'accords'
+        ? accords
+        : notes
+
+    const controller = new AbortController()
+
+    const timer = window.setTimeout(async () => {
+      setFilterOptionsLoading(true)
+
+      try {
+        const parameters = new URLSearchParams({
+          query: inputValue.trim(),
+          limit: '12',
+        })
+
+        const response = await fetch(
+          `http://127.0.0.1:8000/fragrances/filter-options/${filterOptionType}?${parameters}`,
+          { signal: controller.signal },
+        )
+
+        if (!response.ok) {
+          throw new Error('Filter suggestions failed.')
+        }
+
+        const data: string[] = await response.json()
+
+        setFilterOptions(
+          data.filter(
+            (option) =>
+              !selectedValues.some(
+                (selectedValue) =>
+                  selectedValue.toLowerCase() === option.toLowerCase(),
+              ),
+          ),
+        )
+      } catch (requestError) {
+        if (
+          requestError instanceof Error &&
+          requestError.name !== 'AbortError'
+        ) {
+          setFilterOptions([])
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setFilterOptionsLoading(false)
+        }
+      }
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [
+    filterOptionType,
+    accordInput,
+    noteInput,
+    accords,
+    notes,
+  ])
     const showingBrandResults =
     searchMode === 'brand' && !selectedBrand
 
@@ -381,8 +460,13 @@ function App() {
       if (yearFrom) parameters.set('year_from', yearFrom)
       if (yearTo) parameters.set('year_to', yearTo)
       if (gender) parameters.set('gender', gender)
-      if (accord.trim()) parameters.set('accord', accord.trim())
-      if (note.trim()) parameters.set('note', note.trim())
+      accords.forEach((accord) => {
+        parameters.append('accord', accord)
+      })
+
+      notes.forEach((note) => {
+        parameters.append('note', note)
+      })
 
       const countParameters = new URLSearchParams(parameters)
       countParameters.delete('limit')
@@ -585,14 +669,109 @@ function App() {
     setActiveSuggestionIndex(-1)
   }
 
+  function addFilterValues(
+    optionType: 'accords' | 'notes',
+    rawValue: string,
+  ) {
+    const newValues = rawValue
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    if (newValues.length === 0) {
+      return
+    }
+
+    if (optionType === 'accords') {
+      setAccords((currentValues) => {
+        const existingValues = new Set(
+          currentValues.map((value) => value.toLowerCase()),
+        )
+
+        return [
+          ...currentValues,
+          ...newValues.filter(
+            (value) => !existingValues.has(value.toLowerCase()),
+          ),
+        ]
+      })
+
+      setAccordInput('')
+    } else {
+      setNotes((currentValues) => {
+        const existingValues = new Set(
+          currentValues.map((value) => value.toLowerCase()),
+        )
+
+        return [
+          ...currentValues,
+          ...newValues.filter(
+            (value) => !existingValues.has(value.toLowerCase()),
+          ),
+        ]
+      })
+
+      setNoteInput('')
+    }
+  }
+
+  function removeFilterValue(
+    optionType: 'accords' | 'notes',
+    valueToRemove: string,
+  ) {
+    if (optionType === 'accords') {
+      setAccords((currentValues) =>
+        currentValues.filter((value) => value !== valueToRemove),
+      )
+    } else {
+      setNotes((currentValues) =>
+        currentValues.filter((value) => value !== valueToRemove),
+      )
+    }
+  }
+
+  function handleFilterInputKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+    optionType: 'accords' | 'notes',
+  ) {
+    const inputValue =
+      optionType === 'accords'
+        ? accordInput
+        : noteInput
+
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault()
+      addFilterValues(optionType, inputValue)
+      return
+    }
+
+    if (event.key === 'Backspace' && inputValue === '') {
+      if (optionType === 'accords' && accords.length > 0) {
+        removeFilterValue('accords', accords[accords.length - 1])
+      }
+
+      if (optionType === 'notes' && notes.length > 0) {
+        removeFilterValue('notes', notes[notes.length - 1])
+      }
+    }
+
+    if (event.key === 'Escape') {
+      setFilterOptionType(null)
+    }
+  }
+
   function clearFilters() {
     setMinRating('')
     setMaxRating('')
     setYearFrom('')
     setYearTo('')
     setGender('')
-    setAccord('')
-    setNote('')
+    setAccords([])
+    setAccordInput('')
+    setNotes([])
+    setNoteInput('')
+    setFilterOptions([])
+    setFilterOptionType(null)
     setError('')
   }
 
@@ -825,25 +1004,171 @@ function App() {
                 <summary>Advanced filters</summary>
 
                 <div className="advanced-filter-grid">
-                  <label className="filter-field">
-                    <span>Main accord</span>
-                    <input
-                      type="text"
-                      value={accord}
-                      placeholder="Floral, woody, fresh..."
-                      onChange={(event) => setAccord(event.target.value)}
-                    />
-                  </label>
+                  <div className="filter-field filter-multiselect">
+                    <label htmlFor="accord-filter">
+                      Main accords
+                    </label>
 
-                  <label className="filter-field">
-                    <span>Fragrance note</span>
-                    <input
-                      type="text"
-                      value={note}
-                      placeholder="Vanilla, bergamot, musk..."
-                      onChange={(event) => setNote(event.target.value)}
-                    />
-                  </label>
+                    <div className="filter-tag-input">
+                      {accords.map((accord) => (
+                        <span className="filter-tag" key={accord}>
+                          {accord}
+
+                          <button
+                            type="button"
+                            aria-label={`Remove ${accord}`}
+                            onClick={() =>
+                              removeFilterValue('accords', accord)
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+
+                      <input
+                        id="accord-filter"
+                        type="text"
+                        value={accordInput}
+                        placeholder={
+                          accords.length === 0
+                            ? 'Search accords...'
+                            : 'Add another...'
+                        }
+                        autoComplete="off"
+                        aria-expanded={filterOptionType === 'accords'}
+                        aria-controls="accord-options"
+                        onFocus={() => setFilterOptionType('accords')}
+                        onBlur={() => {
+                          window.setTimeout(() => {
+                            setFilterOptionType(null)
+                          }, 0)
+                        }}
+                        onChange={(event) => {
+                          setAccordInput(event.target.value)
+                          setFilterOptionType('accords')
+                        }}
+                        onKeyDown={(event) =>
+                          handleFilterInputKeyDown(event, 'accords')
+                        }
+                      />
+                    </div>
+
+                    {filterOptionType === 'accords' && (
+                      <div
+                        id="accord-options"
+                        className="filter-option-popup"
+                        role="listbox"
+                        aria-label="Accord suggestions"
+                      >
+                        {filterOptionsLoading ? (
+                          <p>Loading suggestions…</p>
+                        ) : filterOptions.length > 0 ? (
+                          filterOptions.map((option) => (
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected="false"
+                              key={option}
+                              onMouseDown={(event) =>
+                                event.preventDefault()
+                              }
+                              onClick={() =>
+                                addFilterValues('accords', option)
+                              }
+                            >
+                              {option}
+                            </button>
+                          ))
+                        ) : (
+                          <p>No matching accords</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="filter-field filter-multiselect">
+                    <label htmlFor="note-filter">
+                      Fragrance notes
+                    </label>
+
+                    <div className="filter-tag-input">
+                      {notes.map((note) => (
+                        <span className="filter-tag" key={note}>
+                          {note}
+
+                          <button
+                            type="button"
+                            aria-label={`Remove ${note}`}
+                            onClick={() =>
+                              removeFilterValue('notes', note)
+                            }
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+
+                      <input
+                        id="note-filter"
+                        type="text"
+                        value={noteInput}
+                        placeholder={
+                          notes.length === 0
+                            ? 'Search notes...'
+                            : 'Add another...'
+                        }
+                        autoComplete="off"
+                        aria-expanded={filterOptionType === 'notes'}
+                        aria-controls="note-options"
+                        onFocus={() => setFilterOptionType('notes')}
+                        onBlur={() => {
+                          window.setTimeout(() => {
+                            setFilterOptionType(null)
+                          }, 0)
+                        }}
+                        onChange={(event) => {
+                          setNoteInput(event.target.value)
+                          setFilterOptionType('notes')
+                        }}
+                        onKeyDown={(event) =>
+                          handleFilterInputKeyDown(event, 'notes')
+                        }
+                      />
+                    </div>
+
+                    {filterOptionType === 'notes' && (
+                      <div
+                        id="note-options"
+                        className="filter-option-popup"
+                        role="listbox"
+                        aria-label="Note suggestions"
+                      >
+                        {filterOptionsLoading ? (
+                          <p>Loading suggestions…</p>
+                        ) : filterOptions.length > 0 ? (
+                          filterOptions.map((option) => (
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected="false"
+                              key={option}
+                              onMouseDown={(event) =>
+                                event.preventDefault()
+                              }
+                              onClick={() =>
+                                addFilterValues('notes', option)
+                              }
+                            >
+                              {option}
+                            </button>
+                          ))
+                        ) : (
+                          <p>No matching notes</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </details>
               <div className="filter-footer">

@@ -45,8 +45,8 @@ def search_fragrances(
     brand: str = None,
     country: str = None,
     gender: str = None,
-    accord: str = None,
-    note: str = None,
+    accord: list[str] = Query(default=[]),
+    note: list[str] = Query(default=[]),
     sort_by: Literal[
     "rating",
     "popularity",
@@ -120,8 +120,8 @@ def count_fragrances(
     brand: str = None,
     country: str = None,
     gender: str = None,
-    accord: str = None,
-    note: str = None,
+    accord: list[str] = Query(default=[]),
+    note: list[str] = Query(default=[]),
     min_rating: float | None = Query(None, ge=0, le=5),
     max_rating: float | None = Query(None, ge=0, le=5),
     year_from: int | None = Query(None, ge=1700, le=2027),
@@ -172,6 +172,21 @@ def count_fragrances(
         year_to=year_to,
         min_vote=min_vote,
         max_vote=max_vote,
+    )
+
+@router.get(
+    "/filter-options/{option_type}",
+    response_model=list[str],
+)
+def get_filter_options(
+    option_type: Literal["accords", "notes"],
+    query: str = "",
+    limit: int = Query(12, ge=1, le=50),
+):
+    return fragrance_service.get_filter_options(
+        option_type=option_type,
+        query=query,
+        limit=limit,
     )
 
 @router.get("/{fragrance_id}", response_model=FragranceDetail)

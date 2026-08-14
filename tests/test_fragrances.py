@@ -79,6 +79,9 @@ def test_search_fragrances(monkeypatch):
         "?name=Dior%20Me"
         "&gender=Women"
         "&note=Cherry"
+        "&note=Musk"
+        "&accord=Floral"
+        "&accord=Fresh"
         "&min_rating=3.5"
         "&year_from=2000"
         "&year_to=2010"
@@ -90,7 +93,8 @@ def test_search_fragrances(monkeypatch):
     assert response.json() == [SEARCH_RESULT]
     assert received_parameters["name"] == "Dior Me"
     assert received_parameters["gender"] == "Women"
-    assert received_parameters["note"] == "Cherry"
+    assert received_parameters["note"] == ["Cherry", "Musk"]
+    assert received_parameters["accord"] == ["Floral", "Fresh"]
     assert received_parameters["min_rating"] == 3.5
     assert received_parameters["year_from"] == 2000
     assert received_parameters["year_to"] == 2010
@@ -113,7 +117,9 @@ def test_count_fragrances(monkeypatch):
         "?name=Dior"
         "&gender=Women"
         "&note=Cherry"
+        "&note=Musk"
         "&accord=Floral"
+        "&accord=Fresh"
         "&min_rating=3.5"
         "&max_rating=5"
         "&year_from=2000"
@@ -124,12 +130,45 @@ def test_count_fragrances(monkeypatch):
     assert response.json() == {"total": 89}
     assert received_parameters["name"] == "Dior"
     assert received_parameters["gender"] == "Women"
-    assert received_parameters["note"] == "Cherry"
-    assert received_parameters["accord"] == "Floral"
+    assert received_parameters["note"] == ["Cherry", "Musk"]
+    assert received_parameters["accord"] == ["Floral", "Fresh"]
     assert received_parameters["min_rating"] == 3.5
     assert received_parameters["max_rating"] == 5
     assert received_parameters["year_from"] == 2000
     assert received_parameters["year_to"] == 2020
+
+def test_get_accord_filter_options(monkeypatch):
+    monkeypatch.setattr(
+        fragrance_service,
+        "get_filter_options",
+        lambda option_type, query, limit: ["Fresh", "Fresh Spicy"],
+    )
+
+    response = client.get(
+        "/fragrances/filter-options/accords"
+        "?query=fresh"
+        "&limit=12"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == ["Fresh", "Fresh Spicy"]
+
+
+def test_get_note_filter_options(monkeypatch):
+    monkeypatch.setattr(
+        fragrance_service,
+        "get_filter_options",
+        lambda option_type, query, limit: ["Vanilla", "Vanilla Flower"],
+    )
+
+    response = client.get(
+        "/fragrances/filter-options/notes"
+        "?query=vanilla"
+        "&limit=12"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == ["Vanilla", "Vanilla Flower"]
 
 def test_get_fragrance_by_id(monkeypatch):
     monkeypatch.setattr(
