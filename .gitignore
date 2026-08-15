@@ -10,6 +10,7 @@ env/
 # Environment variables / secrets
 .env
 .env.*
+!.env.example
 
 # VS Code
 .vscode/
@@ -21,5 +22,11 @@ Thumbs.db
 # Data files
 Fragrance_Data/
 
+# Locally sourced images (verify redistribution rights before publishing)
+Frontend/public/fragrance-images/
+
 # Test Files
 .pytest_cache/
+
+# Personal development notes
+Checklist.txt
