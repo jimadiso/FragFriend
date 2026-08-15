@@ -1936,11 +1936,18 @@ function App() {
               {fragrance.year ?? 'Year unknown'} ·{' '}
               {fragrance.gender ?? 'Unisex'}
             </p>
-            <p>
+            <p className="card-rating">
               Rating:{' '}
               {fragrance.rating_value !== null
                 ? fragrance.rating_value.toFixed(2)
                 : 'Not rated'}
+
+              {fragrance.rating_count !== null && (
+                <span className="card-vote-count">
+                  {' '}
+                  ({fragrance.rating_count.toLocaleString()} votes)
+                </span>
+              )}
             </p>
 
             <button
@@ -2123,11 +2130,18 @@ function App() {
                         {fragrance.year ?? 'Year unknown'} ·{' '}
                         {fragrance.gender ?? 'Unisex'}
                       </p>
-                      <p>
+                      <p className="card-rating">
                         Rating:{' '}
                         {fragrance.rating_value !== null
                           ? fragrance.rating_value.toFixed(2)
                           : 'Not rated'}
+
+                        {fragrance.rating_count !== null && (
+                          <span className="card-vote-count">
+                            {' '}
+                            ({fragrance.rating_count.toLocaleString()} votes)
+                          </span>
+                        )}
                       </p>
 
                       <button
@@ -2414,11 +2428,18 @@ function App() {
                               {fragrance.year ?? 'Year unknown'} ·{' '}
                               {fragrance.gender ?? 'Unisex'}
                             </p>
-                            <p>
+                            <p className="card-rating">
                               Rating:{' '}
                               {fragrance.rating_value !== null
                                 ? fragrance.rating_value.toFixed(2)
                                 : 'Not rated'}
+
+                              {fragrance.rating_count !== null && (
+                                <span className="card-vote-count">
+                                  {' '}
+                                  ({fragrance.rating_count.toLocaleString()} votes)
+                                </span>
+                              )}
                             </p>
 
                             <div className="collection-fragrance-actions">
