@@ -13,7 +13,6 @@ import './AuthModal.css'
 
 
 type AuthModalProps = {
-  isOpen: boolean
   initialMode: AuthMode
   onClose: () => void
   onAuthenticated: (authentication: AuthResponse) => void
@@ -47,7 +46,6 @@ async function readErrorMessage(
 
 
 export function AuthModal({
-  isOpen,
   initialMode,
   onClose,
   onAuthenticated,
@@ -62,18 +60,6 @@ export function AuthModal({
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-
-    setMode(initialMode)
-    setEmail('')
-    setDisplayName('')
-    setPassword('')
-    setPasswordConfirmation('')
-    setError('')
-    setSubmitting(false)
-
     function handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         onClose()
@@ -85,11 +71,7 @@ export function AuthModal({
     return () => {
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [initialMode, isOpen, onClose])
-
-  if (!isOpen) {
-    return null
-  }
+  }, [onClose])
 
   function changeMode(nextMode: AuthMode) {
     setMode(nextMode)

@@ -182,7 +182,6 @@ function App() {
     )
 
     if (!storedToken) {
-      setCurrentUser(null)
       return
     }
 
@@ -240,17 +239,14 @@ function App() {
   }, [])
 
   useEffect(() => {
-    setBookmarkError('')
-
     if (!selectedFragrance || !currentUser) {
-      setIsBookmarked(false)
-      setBookmarkLoading(false)
       return
     }
 
     let requestIsCurrent = true
 
     async function loadBookmarkStatus() {
+      setBookmarkError('')
       setBookmarkLoading(true)
 
       try {
@@ -351,10 +347,6 @@ function App() {
     const trimmedQuery = query.trim()
 
     if (trimmedQuery.length < 2) {
-      setSuggestions([])
-      setSuggestionsOpen(false)
-      setSuggestionsLoading(false)
-      setActiveSuggestionIndex(-1)
       return
     }
 
@@ -443,8 +435,6 @@ function App() {
   }, [query, searchMode])
   useEffect(() => {
     if (!filterOptionType) {
-      setFilterOptions([])
-      setFilterOptionsLoading(false)
       return
     }
 
@@ -581,6 +571,9 @@ function App() {
   async function openFragranceDetails(id: number) {
     setDetailLoading(true)
     setDetailError('')
+    setBookmarkError('')
+    setIsBookmarked(false)
+    setBookmarkLoading(false)
 
     try {
       const response = await fetch(
@@ -605,6 +598,9 @@ function App() {
   function closeFragranceDetails() {
     setSelectedFragrance(null)
     setDetailError('')
+    setBookmarkError('')
+    setIsBookmarked(false)
+    setBookmarkLoading(false)
     setCollectionPickerOpen(false)
     setCollectionActionError('')
     setCollectionActionMessage('')
@@ -973,6 +969,7 @@ function App() {
     setTotalResults(0)
     setSuggestions([])
     setSuggestionsOpen(false)
+    setSuggestionsLoading(false)
     setActiveSuggestionIndex(-1)
   }
 
@@ -1037,6 +1034,12 @@ function App() {
     }
   }
 
+  function closeFilterOptions() {
+    setFilterOptionType(null)
+    setFilterOptions([])
+    setFilterOptionsLoading(false)
+  }
+
   function handleFilterInputKeyDown(
     event: ReactKeyboardEvent<HTMLInputElement>,
     optionType: 'accords' | 'notes',
@@ -1063,7 +1066,7 @@ function App() {
     }
 
     if (event.key === 'Escape') {
-      setFilterOptionType(null)
+      closeFilterOptions()
     }
   }
 
@@ -1077,8 +1080,7 @@ function App() {
     setAccordInput('')
     setNotes([])
     setNoteInput('')
-    setFilterOptions([])
-    setFilterOptionType(null)
+    closeFilterOptions()
     setError('')
   }
 
@@ -1322,6 +1324,9 @@ function App() {
     sessionStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
     sessionStorage.removeItem(AUTH_USER_STORAGE_KEY)
     setCurrentUser(null)
+    setBookmarkError('')
+    setIsBookmarked(false)
+    setBookmarkLoading(false)
     setSavedFragrances([])
     setSavedError('')
     setCollections([])
@@ -1454,7 +1459,17 @@ function App() {
                 id="fragrance-search"
                 type="search"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  const nextQuery = event.target.value
+                  setQuery(nextQuery)
+
+                  if (nextQuery.trim().length < 2) {
+                    setSuggestions([])
+                    setSuggestionsOpen(false)
+                    setSuggestionsLoading(false)
+                    setActiveSuggestionIndex(-1)
+                  }
+                }}
                 onKeyDown={handleSuggestionKeyDown}
                 onFocus={() => {
                   if (suggestions.length > 0 || suggestionsLoading) {
@@ -1662,7 +1677,7 @@ function App() {
                         onFocus={() => setFilterOptionType('accords')}
                         onBlur={() => {
                           window.setTimeout(() => {
-                            setFilterOptionType(null)
+                            closeFilterOptions()
                           }, 0)
                         }}
                         onChange={(event) => {
@@ -1745,7 +1760,7 @@ function App() {
                         onFocus={() => setFilterOptionType('notes')}
                         onBlur={() => {
                           window.setTimeout(() => {
-                            setFilterOptionType(null)
+                            closeFilterOptions()
                           }, 0)
                         }}
                         onChange={(event) => {
@@ -2734,12 +2749,13 @@ function App() {
           </section>
         </div>
       )}
-      <AuthModal
-        isOpen={authModalOpen}
-        initialMode={authMode}
-        onClose={() => setAuthModalOpen(false)}
-        onAuthenticated={handleAuthenticated}
-      />
+      {authModalOpen && (
+        <AuthModal
+          initialMode={authMode}
+          onClose={() => setAuthModalOpen(false)}
+          onAuthenticated={handleAuthenticated}
+        />
+      )}
     </main>
   )
 }
