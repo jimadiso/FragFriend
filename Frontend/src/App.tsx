@@ -1,7 +1,42 @@
-import {useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type SyntheticEvent,} from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type SyntheticEvent,
+} from 'react'
+
+import { AuthModal } from './components/AuthModal'
+import type {
+  AuthMode,
+  AuthResponse,
+  AuthUser,
+} from './types/auth'
+
+import {
+  addBookmark,
+  getBookmarks,
+  getBookmarkStatus,
+  removeBookmark,
+  type BookmarkedFragrance,
+} from './services/bookmarkApi'
+
+import {
+  addFragranceToCollection,
+  createCollection,
+  deleteCollection,
+  getCollection,
+  getCollections,
+  removeFragranceFromCollection,
+  type FragranceCollection,
+  type FragranceCollectionDetail,
+} from './services/collectionApi'
+
 import './App.css'
 
 type SearchMode = 'brand' | 'name'
+type AppView = 'search' | 'saved'
+type SavedTab = 'all' | 'collections'
 
 type SortOption =
   | 'rating-desc'
@@ -50,7 +85,53 @@ type SearchSuggestion = {
   subtitle: string
 }
 
+const AUTH_TOKEN_STORAGE_KEY = 'fragfriend_access_token'
+const AUTH_USER_STORAGE_KEY = 'fragfriend_user'
+const API_BASE_URL = 'http://127.0.0.1:8000'
+
+
+function readStoredUser(): AuthUser | null {
+  const storedUser = sessionStorage.getItem(
+    AUTH_USER_STORAGE_KEY,
+  )
+
+  if (!storedUser) {
+    return null
+  }
+
+  try {
+    return JSON.parse(storedUser) as AuthUser
+  } catch {
+    sessionStorage.removeItem(AUTH_USER_STORAGE_KEY)
+    return null
+  }
+}
+
 function App() {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(readStoredUser)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [appView, setAppView] = useState<AppView>('search')
+  const [savedTab, setSavedTab] = useState<SavedTab>('all')
+  const [savedFragrances, setSavedFragrances] = useState<BookmarkedFragrance[]>([])
+  const [savedLoading, setSavedLoading] = useState(false)
+  const [savedError, setSavedError] = useState('')
+  const [collections, setCollections] = useState<FragranceCollection[]>([])
+  const [collectionsLoading, setCollectionsLoading] = useState(false)
+  const [collectionsError, setCollectionsError] = useState('')
+  const [collectionFormOpen, setCollectionFormOpen] = useState(false)
+  const [selectedCollection, setSelectedCollection] = useState<FragranceCollectionDetail | null>(null)
+  const [selectedCollectionLoading, setSelectedCollectionLoading] = useState(false)
+  const [selectedCollectionError, setSelectedCollectionError] = useState('')
+  const [collectionName, setCollectionName] = useState('')
+  const [collectionDescription, setCollectionDescription] = useState('')
+  const [collectionSubmitting, setCollectionSubmitting] = useState(false)
+  const [collectionPickerOpen, setCollectionPickerOpen] = useState(false)
+  const [collectionDeleting, setCollectionDeleting] = useState(false)
+  const [collectionActionLoadingId, setCollectionActionLoadingId] = useState<number | null>(null)
+  const [collectionActionError, setCollectionActionError] = useState('')
+  const [collectionActionMessage, setCollectionActionMessage] = useState('')
+  const [collectionFormError, setCollectionFormError] = useState('')
   const [searchMode, setSearchMode] = useState<SearchMode>('brand')
   const [query, setQuery] = useState('')
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
@@ -72,16 +153,14 @@ function App() {
   const [yearFrom, setYearFrom] = useState('')
   const [yearTo, setYearTo] = useState('')
   const [gender, setGender] = useState('')
-const [accords, setAccords] = useState<string[]>([])
-const [accordInput, setAccordInput] = useState('')
-const [notes, setNotes] = useState<string[]>([])
-const [noteInput, setNoteInput] = useState('')
-const [filterOptionType, setFilterOptionType] = useState<
-  'accords' | 'notes' | null  >(null) 
-const [filterOptions, setFilterOptions] = useState<string[]>([])
-const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
-const activeFilterCount =
-  [minRating, maxRating, yearFrom, yearTo, gender].filter(Boolean).length +   accords.length +  notes.length
+  const [accords, setAccords] = useState<string[]>([])
+  const [accordInput, setAccordInput] = useState('')
+  const [notes, setNotes] = useState<string[]>([])
+  const [noteInput, setNoteInput] = useState('')
+  const [filterOptionType, setFilterOptionType] = useState<'accords' | 'notes' | null>(null)
+  const [filterOptions, setFilterOptions] = useState<string[]>([])
+  const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
+  const activeFilterCount = [minRating, maxRating, yearFrom, yearTo, gender].filter(Boolean).length +   accords.length +  notes.length
   const [brands, setBrands] = useState<BrandResult[]>([])
   const [selectedBrand, setSelectedBrand] = useState('')
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
@@ -93,6 +172,116 @@ const activeFilterCount =
   const [selectedFragrance, setSelectedFragrance] =  useState<FragranceDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [bookmarkLoading, setBookmarkLoading] = useState(false)
+  const [bookmarkError, setBookmarkError] = useState('')
+
+  useEffect(() => {
+    const storedToken = sessionStorage.getItem(
+      AUTH_TOKEN_STORAGE_KEY,
+    )
+
+    if (!storedToken) {
+      setCurrentUser(null)
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function validateSession() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/auth/me`,
+          {
+            headers: {
+              Authorization: `Bearer ${storedToken}`,
+            },
+            signal: controller.signal,
+          },
+        )
+
+        if (response.status === 401) {
+          sessionStorage.removeItem(
+            AUTH_TOKEN_STORAGE_KEY,
+          )
+          sessionStorage.removeItem(
+            AUTH_USER_STORAGE_KEY,
+          )
+          setCurrentUser(null)
+          return
+        }
+
+        if (!response.ok) {
+          return
+        }
+
+        const user: AuthUser = await response.json()
+
+        sessionStorage.setItem(
+          AUTH_USER_STORAGE_KEY,
+          JSON.stringify(user),
+        )
+        setCurrentUser(user)
+      } catch (requestError) {
+        if (
+          requestError instanceof Error &&
+          requestError.name !== 'AbortError'
+        ) {
+          return
+        }
+      }
+    }
+
+    validateSession()
+
+    return () => {
+      controller.abort()
+    }
+  }, [])
+
+  useEffect(() => {
+    setBookmarkError('')
+
+    if (!selectedFragrance || !currentUser) {
+      setIsBookmarked(false)
+      setBookmarkLoading(false)
+      return
+    }
+
+    let requestIsCurrent = true
+
+    async function loadBookmarkStatus() {
+      setBookmarkLoading(true)
+
+      try {
+        const status = await getBookmarkStatus(
+          selectedFragrance!.id,
+        )
+
+        if (requestIsCurrent) {
+          setIsBookmarked(status.bookmarked)
+        }
+      } catch (requestError) {
+        if (requestIsCurrent) {
+          setBookmarkError(
+            requestError instanceof Error
+              ? requestError.message
+              : 'We could not load this bookmark.',
+          )
+        }
+      } finally {
+        if (requestIsCurrent) {
+          setBookmarkLoading(false)
+        }
+      }
+    }
+
+    loadBookmarkStatus()
+
+    return () => {
+      requestIsCurrent = false
+    }
+  }, [selectedFragrance, currentUser])
 
   useEffect(() => {
     function handleClickOutside(event: PointerEvent) {
@@ -416,6 +605,124 @@ const activeFilterCount =
   function closeFragranceDetails() {
     setSelectedFragrance(null)
     setDetailError('')
+    setCollectionPickerOpen(false)
+    setCollectionActionError('')
+    setCollectionActionMessage('')
+    setCollectionActionLoadingId(null)
+  }
+
+  async function toggleSelectedFragranceBookmark() {
+    if (!currentUser) {
+      openAuthModal('login')
+      return
+    }
+
+    if (!selectedFragrance || bookmarkLoading) {
+      return
+    }
+
+    setBookmarkLoading(true)
+    setBookmarkError('')
+
+    try {
+      const status = isBookmarked
+        ? await removeBookmark(selectedFragrance.id)
+        : await addBookmark(selectedFragrance.id)
+
+      setIsBookmarked(status.bookmarked)
+
+      if (!status.bookmarked) {
+        setSavedFragrances((currentFragrances) =>
+          currentFragrances.filter(
+            (fragrance) =>
+              fragrance.id !== selectedFragrance.id,
+          ),
+        )
+      }
+
+    } catch (requestError) {
+      setBookmarkError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not update this bookmark.',
+      )
+    } finally {
+      setBookmarkLoading(false)
+    }
+  }
+
+  async function openCollectionPicker() {
+    if (!currentUser) {
+      openAuthModal('login')
+      return
+    }
+
+    setCollectionPickerOpen(true)
+    setCollectionActionError('')
+    setCollectionActionMessage('')
+    setCollectionsLoading(true)
+
+    try {
+      const collectionResults = await getCollections()
+      setCollections(collectionResults)
+    } catch (requestError) {
+      setCollectionActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not load your collections.',
+      )
+    } finally {
+      setCollectionsLoading(false)
+    }
+  }
+
+  async function addSelectedFragranceToCollection(
+    collectionId: number,
+  ) {
+    if (
+      !selectedFragrance ||
+      collectionActionLoadingId !== null
+    ) {
+      return
+    }
+
+    const selectedCollection = collections.find(
+      (collection) => collection.id === collectionId,
+    )
+
+    setCollectionActionLoadingId(collectionId)
+    setCollectionActionError('')
+    setCollectionActionMessage('')
+
+    try {
+      await addFragranceToCollection(
+        collectionId,
+        selectedFragrance.id,
+      )
+
+      setIsBookmarked(true)
+      setCollectionActionMessage(
+        selectedCollection
+          ? `Added to ${selectedCollection.name}.`
+          : 'Added to collection.',
+      )
+
+      try {
+        const refreshedCollections =
+          await getCollections()
+        setCollections(refreshedCollections)
+      } catch {
+        // The fragrance was still added successfully.
+      }
+    } catch (requestError) {
+      setCollectionActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not add this fragrance.',
+      )
+    } finally {
+      setCollectionActionLoadingId(null)
+    }
   }
 
   function getSortParameters(option: SortOption) {
@@ -775,9 +1082,323 @@ const activeFilterCount =
     setError('')
   }
 
+  function openAuthModal(mode: AuthMode) {
+    setAuthMode(mode)
+    setAuthModalOpen(true)
+  }
+
+  function handleAuthenticated(
+    authentication: AuthResponse,
+  ) {
+    sessionStorage.setItem(
+      AUTH_TOKEN_STORAGE_KEY,
+      authentication.access_token,
+    )
+    sessionStorage.setItem(
+      AUTH_USER_STORAGE_KEY,
+      JSON.stringify(authentication.user),
+    )
+
+    setCurrentUser(authentication.user)
+  }
+
+  async function openSavedLibrary() {
+    if (!currentUser) {
+      openAuthModal('login')
+      return
+    }
+
+    setAppView('saved')
+    setSavedTab('all')
+    setSavedLoading(true)
+    setSavedError('')
+
+    try {
+      const bookmarks = await getBookmarks()
+      setSavedFragrances(bookmarks)
+    } catch (requestError) {
+      setSavedError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not load your saved fragrances.',
+      )
+    } finally {
+      setSavedLoading(false)
+    }
+  }
+
+  async function openCollectionsTab() {
+    setSavedTab('collections')
+    setCollectionsLoading(true)
+    setCollectionsError('')
+
+    try {
+      const collectionResults = await getCollections()
+      setCollections(collectionResults)
+    } catch (requestError) {
+      setCollectionsError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not load your collections.',
+      )
+    } finally {
+      setCollectionsLoading(false)
+    }
+  }
+
+  async function openCollection(collectionId: number) {
+    setSelectedCollection(null)
+    setSelectedCollectionLoading(true)
+    setSelectedCollectionError('')
+
+    try {
+      const collection = await getCollection(collectionId)
+      setSelectedCollection(collection)
+    } catch (requestError) {
+      setSelectedCollectionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not load this collection.',
+      )
+    } finally {
+      setSelectedCollectionLoading(false)
+    }
+  }
+
+  function closeCollection() {
+    setSelectedCollection(null)
+    setSelectedCollectionError('')
+  }
+
+  async function removeSelectedCollectionFragrance(
+    fragranceId: number,
+  ) {
+    if (
+      !selectedCollection ||
+      collectionActionLoadingId !== null
+    ) {
+      return
+    }
+
+    const collectionId = selectedCollection.id
+
+    setCollectionActionLoadingId(fragranceId)
+    setSelectedCollectionError('')
+
+    try {
+      await removeFragranceFromCollection(
+        collectionId,
+        fragranceId,
+      )
+
+      setSelectedCollection((currentCollection) => {
+        if (
+          !currentCollection ||
+          currentCollection.id !== collectionId
+        ) {
+          return currentCollection
+        }
+
+        return {
+          ...currentCollection,
+          fragrance_count: Math.max(
+            0,
+            currentCollection.fragrance_count - 1,
+          ),
+          fragrances: currentCollection.fragrances.filter(
+            (fragrance) => fragrance.id !== fragranceId,
+          ),
+        }
+      })
+
+      setCollections((currentCollections) =>
+        currentCollections.map((collection) =>
+          collection.id === collectionId
+            ? {
+                ...collection,
+                fragrance_count: Math.max(
+                  0,
+                  collection.fragrance_count - 1,
+                ),
+              }
+            : collection,
+        ),
+      )
+    } catch (requestError) {
+      setSelectedCollectionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not remove this fragrance.',
+      )
+    } finally {
+      setCollectionActionLoadingId(null)
+    }
+  }
+
+  async function handleDeleteSelectedCollection() {
+    if (!selectedCollection || collectionDeleting) {
+      return
+    }
+
+    const collectionId = selectedCollection.id
+    const collectionNameToDelete = selectedCollection.name
+
+    const confirmed = window.confirm(
+      `Delete "${collectionNameToDelete}"? The fragrances will remain in All saved fragrances.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setCollectionDeleting(true)
+    setSelectedCollectionError('')
+
+    try {
+      await deleteCollection(collectionId)
+
+      setCollections((currentCollections) =>
+        currentCollections.filter(
+          (collection) => collection.id !== collectionId,
+        ),
+      )
+
+      setSelectedCollection(null)
+    } catch (requestError) {
+      setSelectedCollectionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not delete this collection.',
+      )
+    } finally {
+      setCollectionDeleting(false)
+    }
+  }
+
+  async function handleCreateCollection(
+    event: SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+
+    const trimmedName = collectionName.trim()
+    const trimmedDescription =
+      collectionDescription.trim()
+
+    if (!trimmedName) {
+      setCollectionFormError(
+        'Enter a name for your collection.',
+      )
+      return
+    }
+
+    setCollectionSubmitting(true)
+    setCollectionFormError('')
+
+    try {
+      const newCollection = await createCollection({
+        name: trimmedName,
+        description: trimmedDescription || null,
+      })
+
+      setCollections((currentCollections) => [
+        newCollection,
+        ...currentCollections,
+      ])
+      setCollectionName('')
+      setCollectionDescription('')
+      setCollectionFormOpen(false)
+    } catch (requestError) {
+      setCollectionFormError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not create this collection.',
+      )
+    } finally {
+      setCollectionSubmitting(false)
+    }
+  }
+
+  function signOut() {
+    sessionStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+    sessionStorage.removeItem(AUTH_USER_STORAGE_KEY)
+    setCurrentUser(null)
+    setSavedFragrances([])
+    setSavedError('')
+    setCollections([])
+    setCollectionsError('')
+    setCollectionFormOpen(false)
+    setAppView('search')
+  }
+
   return (
     <main className="app">
-      <section className="search-section">
+      <header className="account-header">
+                {currentUser ? (
+          <div className="account-session">
+            <span>
+              Hello, {currentUser.display_name}
+            </span>
+
+            <button
+              type="button"
+              className={
+                appView === 'saved'
+                  ? ''
+                  : 'bookmark-navigation-button'
+              }
+              aria-label={
+                appView === 'saved'
+                  ? 'Back to search'
+                  : 'Open saved fragrances'
+              }
+              title={
+                appView === 'saved'
+                  ? 'Back to search'
+                  : 'Saved fragrances'
+              }
+              onClick={
+                appView === 'saved'
+                  ? () => setAppView('search')
+                  : openSavedLibrary
+              }
+            >
+              {appView === 'saved' ? (
+                'Back to search'
+              ) : (
+                <span
+                  className="bookmark-ribbon-icon"
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+
+            <button type="button" onClick={signOut}>
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="account-actions">
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+            >
+              Sign in
+            </button>
+
+            <button
+              type="button"
+              className="create-account-button"
+              onClick={() => openAuthModal('register')}
+            >
+              Create account
+            </button>
+          </div>
+        )}
+      </header>
+      <section
+        className="search-section"
+        hidden={appView !== 'search'}
+      >
         <p className="eyebrow">FragFriend</p>
         <h1>Find <span className="headline-emphasis">your</span> next scent</h1>
         <p className="introduction">
@@ -1188,7 +1809,11 @@ const activeFilterCount =
         {error && <p className="error-message">{error}</p>}
       </section>
 
-      <section className="results" aria-live="polite">
+      <section
+        className="results"
+        aria-live="polite"
+        hidden={appView !== 'search'}
+      >
         {!loading && !hasSearched && !error && (
           <p>Your search results will appear here.</p>
         )}
@@ -1392,6 +2017,451 @@ const activeFilterCount =
             </nav>
           )}
       </section>
+
+      <section
+        className="saved-library"
+        hidden={appView !== 'saved'}
+        aria-labelledby="saved-library-title"
+      >
+        <div className="saved-library-header">
+          <div>
+            <p className="eyebrow">Your library</p>
+            <h2 id="saved-library-title">
+              Saved fragrances
+            </h2>
+          </div>
+
+          <div
+            className="saved-tabs"
+            role="tablist"
+            aria-label="Saved fragrance views"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={savedTab === 'all'}
+              className={
+                savedTab === 'all' ? 'is-active' : ''
+              }
+              onClick={() => setSavedTab('all')}
+            >
+              All
+            </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={savedTab === 'collections'}
+              className={
+                savedTab === 'collections'
+                  ? 'is-active'
+                  : ''
+              }
+              onClick={() => void openCollectionsTab()}
+            >
+              Collections
+            </button>
+          </div>
+        </div>
+
+        {savedTab === 'all' && (
+          <>
+            {savedLoading && (
+              <p className="saved-message">
+                Loading your saved fragrances...
+              </p>
+            )}
+
+            {!savedLoading && savedError && (
+              <p
+                className="saved-message saved-error"
+                role="alert"
+              >
+                {savedError}
+              </p>
+            )}
+
+            {!savedLoading &&
+              !savedError &&
+              savedFragrances.length === 0 && (
+                <p className="saved-message">
+                  You haven’t saved any fragrances yet.
+                </p>
+              )}
+
+            {!savedLoading &&
+              !savedError &&
+              savedFragrances.length > 0 && (
+                <div className="saved-grid">
+                  {savedFragrances.map((fragrance) => (
+                    <article
+                      className="fragrance-card"
+                      key={fragrance.id}
+                    >
+                      <div className="fragrance-image-wrapper">
+                        {fragrance.image_url ? (
+                          <img
+                            className="fragrance-image"
+                            src={fragrance.image_url}
+                            alt={`${fragrance.perfume} by ${fragrance.brand}`}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="fragrance-image-placeholder">
+                            <span>
+                              {fragrance.brand.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="brand">
+                        {fragrance.brand}
+                      </p>
+                      <h2>{fragrance.perfume}</h2>
+                      <p>
+                        {fragrance.year ?? 'Year unknown'} ·{' '}
+                        {fragrance.gender ?? 'Unisex'}
+                      </p>
+                      <p>
+                        Rating:{' '}
+                        {fragrance.rating_value !== null
+                          ? fragrance.rating_value.toFixed(2)
+                          : 'Not rated'}
+                      </p>
+
+                      <button
+                        type="button"
+                        className="card-action"
+                        onClick={() =>
+                          openFragranceDetails(fragrance.id)
+                        }
+                      >
+                        View more info →
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+          </>
+        )}
+
+        {savedTab === 'collections' && (
+          <>
+            <div className="collection-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setCollectionFormError('')
+                  setCollectionFormOpen(true)
+                }}
+              >
+                + New collection
+              </button>
+            </div>
+
+            {collectionFormOpen && (
+              <form
+                className="collection-form"
+                onSubmit={handleCreateCollection}
+              >
+                <div className="collection-form-heading">
+                  <div>
+                    <p className="eyebrow">
+                      New collection
+                    </p>
+                    <h3>Create a collection</h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="collection-form-close"
+                    aria-label="Close collection form"
+                    onClick={() => {
+                      setCollectionFormOpen(false)
+                      setCollectionFormError('')
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <label>
+                  Collection name
+                  <input
+                    type="text"
+                    value={collectionName}
+                    maxLength={80}
+                    placeholder="Date Night"
+                    onChange={(event) =>
+                      setCollectionName(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </label>
+
+                <label>
+                  Description
+                  <textarea
+                    value={collectionDescription}
+                    maxLength={240}
+                    placeholder="Fragrances for evenings and special occasions"
+                    onChange={(event) =>
+                      setCollectionDescription(
+                        event.target.value,
+                      )
+                    }
+                  />
+                </label>
+
+                {collectionFormError && (
+                  <p
+                    className="collection-form-error"
+                    role="alert"
+                  >
+                    {collectionFormError}
+                  </p>
+                )}
+
+                <div className="collection-form-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCollectionFormOpen(false)
+                      setCollectionFormError('')
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={collectionSubmitting}
+                  >
+                    {collectionSubmitting
+                      ? 'Creating...'
+                      : 'Create collection'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {collectionsLoading && (
+              <p className="saved-message">
+                Loading your collections...
+              </p>
+            )}
+
+            {!collectionsLoading && collectionsError && (
+              <p
+                className="saved-message saved-error"
+                role="alert"
+              >
+                {collectionsError}
+              </p>
+            )}
+
+            {!collectionsLoading &&
+              !collectionsError &&
+              collections.length === 0 && (
+                <p className="saved-message">
+                  Create your first collection to organize
+                  fragrances by mood, season, occasion, or
+                  anything else.
+                </p>
+              )}
+
+            {!collectionsLoading &&
+              !collectionsError &&
+              collections.length > 0 && (
+                <div className="collection-grid">
+                  {collections.map((collection) => (
+                    <button
+                      type="button"
+                      className="collection-card"
+                      key={collection.id}
+                      onClick={() =>
+                        void openCollection(collection.id)
+                      }
+                    >
+                      <p className="eyebrow">
+                        Collection
+                      </p>
+                      <h3>{collection.name}</h3>
+
+                      {collection.description && (
+                        <p>{collection.description}</p>
+                      )}
+
+                      <p className="collection-count">
+                        {collection.fragrance_count}{' '}
+                        {collection.fragrance_count === 1
+                          ? 'fragrance'
+                          : 'fragrances'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+          </>
+        )}
+      </section>
+      {(selectedCollectionLoading ||
+        selectedCollectionError ||
+        selectedCollection) && (
+        <div
+          className="detail-backdrop"
+          onClick={closeCollection}
+        >
+          <section
+            className="detail-modal collection-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="collection-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="detail-close"
+              aria-label="Close collection"
+              onClick={closeCollection}
+            >
+              ×
+            </button>
+
+            {selectedCollectionLoading && (
+              <p className="detail-status">
+                Loading collection…
+              </p>
+            )}
+
+            {!selectedCollectionLoading &&
+              selectedCollectionError && (
+                <p className="detail-error">
+                  {selectedCollectionError}
+                </p>
+              )}
+
+            {!selectedCollectionLoading &&
+              selectedCollection && (
+                <>
+                  <header className="collection-detail-header">
+                    <p className="eyebrow">Collection</p>
+                    <h2 id="collection-detail-title">
+                      {selectedCollection.name}
+                    </h2>
+
+                    {selectedCollection.description && (
+                      <p>{selectedCollection.description}</p>
+                    )}
+
+                    <p className="collection-count">
+                      {selectedCollection.fragrances.length}{' '}
+                      {selectedCollection.fragrances.length === 1
+                        ? 'fragrance'
+                        : 'fragrances'}
+                    </p>
+                    <button
+                      type="button"
+                      className="collection-delete-button"
+                      onClick={() =>
+                        void handleDeleteSelectedCollection()
+                      }
+                      disabled={collectionDeleting}
+                    >
+                      {collectionDeleting
+                        ? 'Deleting...'
+                        : 'Delete collection'}
+                    </button>
+                  </header>
+
+                  {selectedCollection.fragrances.length === 0 ? (
+                    <p className="saved-message">
+                      This collection does not contain any
+                      fragrances yet.
+                    </p>
+                  ) : (
+                    <div className="saved-grid collection-detail-grid">
+                      {selectedCollection.fragrances.map(
+                        (fragrance) => (
+                          <article
+                            className="fragrance-card"
+                            key={fragrance.id}
+                          >
+                            <div className="fragrance-image-wrapper">
+                              {fragrance.image_url ? (
+                                <img
+                                  className="fragrance-image"
+                                  src={fragrance.image_url}
+                                  alt={`${fragrance.perfume} by ${fragrance.brand}`}
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="fragrance-image-placeholder">
+                                  <span>
+                                    {fragrance.brand.charAt(0)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <p className="brand">
+                              {fragrance.brand}
+                            </p>
+                            <h2>{fragrance.perfume}</h2>
+                            <p>
+                              {fragrance.year ?? 'Year unknown'} ·{' '}
+                              {fragrance.gender ?? 'Unisex'}
+                            </p>
+                            <p>
+                              Rating:{' '}
+                              {fragrance.rating_value !== null
+                                ? fragrance.rating_value.toFixed(2)
+                                : 'Not rated'}
+                            </p>
+
+                            <div className="collection-fragrance-actions">
+                              <button
+                                type="button"
+                                className="card-action"
+                                onClick={() =>
+                                  openFragranceDetails(
+                                    fragrance.id,
+                                  )
+                                }
+                              >
+                                View more info →
+                              </button>
+
+                              <button
+                                type="button"
+                                className="collection-remove-action"
+                                onClick={() =>
+                                  void removeSelectedCollectionFragrance(
+                                    fragrance.id,
+                                  )
+                                }
+                                disabled={
+                                  collectionActionLoadingId !== null
+                                }
+                              >
+                                {collectionActionLoadingId ===
+                                fragrance.id
+                                  ? 'Removing...'
+                                  : 'Remove'}
+                              </button>
+                            </div>
+                          </article>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+          </section>
+        </div>
+      )}
       {(detailLoading || detailError || selectedFragrance) && (
         <div
           className="detail-backdrop"
@@ -1459,6 +2529,124 @@ const activeFilterCount =
                       ` from ${selectedFragrance.rating_count.toLocaleString()} votes`}
                   </p>
 
+                <div className="detail-save-actions">
+                  <div className="detail-bookmark-area">
+                    <button
+                      type="button"
+                      className={`detail-bookmark-button${
+                        isBookmarked ? ' is-bookmarked' : ''
+                      }`}
+                      onClick={toggleSelectedFragranceBookmark}
+                      disabled={bookmarkLoading}
+                    >
+                      {!currentUser
+                        ? 'Sign in to save'
+                        : bookmarkLoading
+                          ? isBookmarked
+                            ? 'Removing...'
+                            : 'Saving...'
+                          : isBookmarked
+                            ? 'Saved ✓'
+                            : 'Save fragrance'}
+                    </button>
+
+                    {bookmarkError && (
+                      <p
+                        className="detail-bookmark-error"
+                        role="alert"
+                      >
+                        {bookmarkError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="detail-collection-area">
+                    <button
+                      type="button"
+                      className="detail-collection-button"
+                      onClick={() => {
+                        if (collectionPickerOpen) {
+                          setCollectionPickerOpen(false)
+                          setCollectionActionError('')
+                          setCollectionActionMessage('')
+                        } else {
+                          void openCollectionPicker()
+                        }
+                      }}
+                    >
+                      {collectionPickerOpen
+                        ? 'Close collections'
+                        : 'Add to collection'}
+                    </button>
+
+                    {collectionPickerOpen && (
+                      <div className="detail-collection-picker">
+                        <h3>Choose a collection</h3>
+
+                        {collectionsLoading && (
+                          <p>Loading collections...</p>
+                        )}
+
+                        {!collectionsLoading &&
+                          collectionActionError && (
+                            <p
+                              className="detail-collection-error"
+                              role="alert"
+                            >
+                              {collectionActionError}
+                            </p>
+                          )}
+
+                        {!collectionsLoading &&
+                          !collectionActionError &&
+                          collections.length === 0 && (
+                            <p>
+                              You have no collections yet. Create one
+                              from Saved → Collections.
+                            </p>
+                          )}
+
+                        {!collectionsLoading &&
+                          collections.length > 0 && (
+                            <div className="detail-collection-list">
+                              {collections.map((collection) => (
+                                <button
+                                  key={collection.id}
+                                  type="button"
+                                  onClick={() =>
+                                    void addSelectedFragranceToCollection(
+                                      collection.id,
+                                    )
+                                  }
+                                  disabled={
+                                    collectionActionLoadingId !== null
+                                  }
+                                >
+                                  <span>{collection.name}</span>
+                                  <span>
+                                    {collectionActionLoadingId ===
+                                    collection.id
+                                      ? 'Adding...'
+                                      : `${collection.fragrance_count} saved`}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                        {collectionActionMessage && (
+                          <p
+                            className="detail-collection-success"
+                            role="status"
+                          >
+                            {collectionActionMessage}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  </div>
+
                   <div className="detail-notes">
                     <div>
                       <h3>Top notes</h3>
@@ -1525,6 +2713,12 @@ const activeFilterCount =
           </section>
         </div>
       )}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialMode={authMode}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthenticated={handleAuthenticated}
+      />
     </main>
   )
 }

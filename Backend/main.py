@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from Backend.routes.fragrances import router as fragrance_router
 from Backend.routes.auth import router as auth_router
 from Backend.routes.bookmarks import router as bookmark_router
+from Backend.routes.collections import router as collection_router
+
 
 app = FastAPI()
 
@@ -29,3 +31,4 @@ def home():
 app.include_router(fragrance_router)
 app.include_router(auth_router)
 app.include_router(bookmark_router)
+app.include_router(collection_router)
