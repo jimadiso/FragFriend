@@ -17,6 +17,7 @@ jobs:
 
     env:
       DB_PASSWORD: test-only-placeholder
+      JWT_SECRET: test-only-jwt-secret-that-is-long-enough
 
     steps:
       - name: Check out repository
