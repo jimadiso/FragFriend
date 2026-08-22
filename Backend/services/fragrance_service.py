@@ -2,34 +2,194 @@ from sqlalchemy import text
 from Backend.database import engine
 
 
+def _build_brand_filters(
+    name: str = None,
+    gender: str = None,
+    accord: list[str] | None = None,
+    note: list[str] | None = None,
+    min_rating: float = None,
+    max_rating: float = None,
+    year_from: int = None,
+    year_to: int = None,
+    min_vote: int = None,
+    max_vote: int = None,
+):
+    conditions = [
+        "brand IS NOT NULL",
+        "TRIM(brand) != ''",
+    ]
+    params = {}
+
+    if name:
+        conditions.append("brand ILIKE :name")
+        params["name"] = f"%{name}%"
+
+    if gender:
+        conditions.append("LOWER(gender) = LOWER(:gender)")
+        params["gender"] = gender
+
+    for index, accord_value in enumerate(accord or []):
+        cleaned_accord = accord_value.strip()
+
+        if not cleaned_accord:
+            continue
+
+        parameter_name = f"accord_{index}"
+
+        conditions.append(
+            f"""
+            (
+                mainaccord1 ILIKE :{parameter_name} OR
+                mainaccord2 ILIKE :{parameter_name} OR
+                mainaccord3 ILIKE :{parameter_name} OR
+                mainaccord4 ILIKE :{parameter_name} OR
+                mainaccord5 ILIKE :{parameter_name}
+            )
+            """
+        )
+        params[parameter_name] = f"%{cleaned_accord}%"
+
+    for index, note_value in enumerate(note or []):
+        cleaned_note = note_value.strip()
+
+        if not cleaned_note:
+            continue
+
+        parameter_name = f"note_{index}"
+
+        conditions.append(
+            f"""
+            (
+                top_notes ILIKE :{parameter_name} OR
+                middle_notes ILIKE :{parameter_name} OR
+                base_notes ILIKE :{parameter_name}
+            )
+            """
+        )
+        params[parameter_name] = f"%{cleaned_note}%"
+
+    if min_rating is not None:
+        conditions.append("rating_value >= :min_rating")
+        params["min_rating"] = min_rating
+
+    if max_rating is not None:
+        conditions.append("rating_value <= :max_rating")
+        params["max_rating"] = max_rating
+
+    if year_from is not None:
+        conditions.append("year >= :year_from")
+        params["year_from"] = year_from
+
+    if year_to is not None:
+        conditions.append("year <= :year_to")
+        params["year_to"] = year_to
+
+    if min_vote is not None:
+        conditions.append("rating_count >= :min_vote")
+        params["min_vote"] = min_vote
+
+    if max_vote is not None:
+        conditions.append("rating_count <= :max_vote")
+        params["max_vote"] = max_vote
+
+    return " AND ".join(conditions), params
+
+
 def search_brands(
     name: str = None,
+    gender: str = None,
+    accord: list[str] | None = None,
+    note: list[str] | None = None,
+    min_rating: float = None,
+    max_rating: float = None,
+    year_from: int = None,
+    year_to: int = None,
+    min_vote: int = None,
+    max_vote: int = None,
+    sort_by: str = "count",
+    order: str = "desc",
     limit: int = 8,
     offset: int = 0,
 ):
-    query = """
-        SELECT
-            MIN(brand) AS brand,
-            COUNT(*) AS fragrance_count,
-            ROUND(AVG(rating_value)::numeric, 2)::float
-                AS average_rating
-        FROM fragrances
-        WHERE brand IS NOT NULL
-          AND TRIM(brand) != ''
-    """
+    filter_sql, params = _build_brand_filters(
+        name=name,
+        gender=gender,
+        accord=accord,
+        note=note,
+        min_rating=min_rating,
+        max_rating=max_rating,
+        year_from=year_from,
+        year_to=year_to,
+        min_vote=min_vote,
+        max_vote=max_vote,
+    )
 
-    params = {
-        "limit": limit,
-        "offset": offset,
+    allowed_sort_columns = {
+        "count": "fragrance_count",
+        "rating": "average_rating",
+        "name": "brand",
     }
 
-    if name:
-        query += " AND brand ILIKE :name"
-        params["name"] = f"%{name}%"
+    sort_column = allowed_sort_columns.get(
+        sort_by.lower(),
+        "fragrance_count",
+    )
+    sort_direction = (
+        "ASC"
+        if order.lower() == "asc"
+        else "DESC"
+    )
 
-    query += """
-        GROUP BY LOWER(brand)
-        ORDER BY fragrance_count DESC, MIN(brand) ASC
+    if sort_column == "brand":
+        secondary_sort = ""
+    else:
+        secondary_sort = ", fragrance_count DESC, brand ASC"
+
+    reputation_filter_sql = ""
+
+    if sort_column == "average_rating":
+        reputation_filter_sql = """
+        WHERE overall_brand_ratings.rated_fragrance_count >= 5
+          AND overall_brand_ratings.total_votes >= 1000
+        """
+
+    params["limit"] = limit
+    params["offset"] = offset
+
+    query = f"""
+        WITH filtered_brands AS (
+            SELECT
+                LOWER(brand) AS brand_key,
+                MIN(brand) AS brand,
+                COUNT(*) AS fragrance_count
+            FROM fragrances
+            WHERE {filter_sql}
+            GROUP BY LOWER(brand)
+        ),
+        overall_brand_ratings AS (
+            SELECT
+                LOWER(brand) AS brand_key,
+                ROUND(AVG(rating_value)::numeric, 2)::float
+                    AS average_rating,
+                COUNT(rating_value) AS rated_fragrance_count,
+                COALESCE(SUM(rating_count), 0) AS total_votes
+            FROM fragrances
+            WHERE brand IS NOT NULL
+              AND TRIM(brand) != ''
+            GROUP BY LOWER(brand)
+        )
+        SELECT
+            filtered_brands.brand,
+            filtered_brands.fragrance_count,
+            overall_brand_ratings.average_rating
+        FROM filtered_brands
+        JOIN overall_brand_ratings
+          ON overall_brand_ratings.brand_key =
+             filtered_brands.brand_key
+        {reputation_filter_sql}
+        ORDER BY
+            {sort_column} {sort_direction}
+            NULLS LAST{secondary_sort}
         LIMIT :limit
         OFFSET :offset
     """
@@ -37,6 +197,66 @@ def search_brands(
     with engine.connect() as conn:
         result = conn.execute(text(query), params)
         return [dict(row._mapping) for row in result]
+
+
+def count_brands(
+    name: str = None,
+    gender: str = None,
+    accord: list[str] | None = None,
+    note: list[str] | None = None,
+    min_rating: float = None,
+    max_rating: float = None,
+    year_from: int = None,
+    year_to: int = None,
+    min_vote: int = None,
+    max_vote: int = None,
+    sort_by: str = "count",
+):
+    filter_sql, params = _build_brand_filters(
+        name=name,
+        gender=gender,
+        accord=accord,
+        note=note,
+        min_rating=min_rating,
+        max_rating=max_rating,
+        year_from=year_from,
+        year_to=year_to,
+        min_vote=min_vote,
+        max_vote=max_vote,
+    )
+
+    reputation_join_sql = ""
+
+    if sort_by.lower() == "rating":
+        reputation_join_sql = """
+        JOIN (
+            SELECT LOWER(brand) AS brand_key
+            FROM fragrances
+            WHERE brand IS NOT NULL
+              AND TRIM(brand) != ''
+            GROUP BY LOWER(brand)
+            HAVING COUNT(rating_value) >= 5
+               AND COALESCE(SUM(rating_count), 0) >= 1000
+        ) AS reputable_brands
+          ON reputable_brands.brand_key =
+             matching_brands.brand_key
+        """
+
+    query = f"""
+        WITH matching_brands AS (
+            SELECT LOWER(brand) AS brand_key
+            FROM fragrances
+            WHERE {filter_sql}
+            GROUP BY LOWER(brand)
+        )
+        SELECT COUNT(*)
+        FROM matching_brands
+        {reputation_join_sql}
+    """
+
+    with engine.connect() as conn:
+        total = conn.execute(text(query), params).scalar_one()
+        return {"total": total}
 
 
 def search_fragrances(

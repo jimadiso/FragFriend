@@ -27,16 +27,127 @@ def get_fragrances(
     )
 
 
+def _validate_brand_filter_ranges(
+    min_rating: float | None,
+    max_rating: float | None,
+    year_from: int | None,
+    year_to: int | None,
+    min_vote: int | None,
+    max_vote: int | None,
+):
+    if (
+        min_rating is not None
+        and max_rating is not None
+        and min_rating > max_rating
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="min_rating cannot be greater than max_rating",
+        )
+
+    if (
+        year_from is not None
+        and year_to is not None
+        and year_from > year_to
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="year_from cannot be greater than year_to",
+        )
+
+    if (
+        min_vote is not None
+        and max_vote is not None
+        and min_vote > max_vote
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="min_vote cannot be greater than max_vote",
+        )
+
+
 @router.get("/brands/search", response_model=list[BrandSearchResult])
 def search_brands(
     name: str | None = None,
+    gender: str | None = None,
+    accord: list[str] = Query(default=[]),
+    note: list[str] = Query(default=[]),
+    min_rating: float | None = Query(None, ge=0, le=5),
+    max_rating: float | None = Query(None, ge=0, le=5),
+    year_from: int | None = Query(None, ge=1700, le=2027),
+    year_to: int | None = Query(None, ge=1700, le=2027),
+    min_vote: int | None = Query(None, ge=0),
+    max_vote: int | None = Query(None, ge=0),
+    sort_by: Literal["count", "rating", "name"] = "count",
+    order: Literal["asc", "desc"] = "desc",
     limit: int = Query(8, ge=1, le=50),
     offset: int = Query(0, ge=0),
 ):
+    _validate_brand_filter_ranges(
+        min_rating=min_rating,
+        max_rating=max_rating,
+        year_from=year_from,
+        year_to=year_to,
+        min_vote=min_vote,
+        max_vote=max_vote,
+    )
+
     return fragrance_service.search_brands(
         name=name,
+        gender=gender,
+        accord=accord,
+        note=note,
+        min_rating=min_rating,
+        max_rating=max_rating,
+        year_from=year_from,
+        year_to=year_to,
+        min_vote=min_vote,
+        max_vote=max_vote,
+        sort_by=sort_by,
+        order=order,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get(
+    "/brands/search/count",
+    response_model=FragranceCountResult,
+)
+def count_brands(
+    name: str | None = None,
+    gender: str | None = None,
+    accord: list[str] = Query(default=[]),
+    note: list[str] = Query(default=[]),
+    min_rating: float | None = Query(None, ge=0, le=5),
+    max_rating: float | None = Query(None, ge=0, le=5),
+    year_from: int | None = Query(None, ge=1700, le=2027),
+    year_to: int | None = Query(None, ge=1700, le=2027),
+    min_vote: int | None = Query(None, ge=0),
+    max_vote: int | None = Query(None, ge=0),
+    sort_by: Literal["count", "rating", "name"] = "count",
+):
+    _validate_brand_filter_ranges(
+        min_rating=min_rating,
+        max_rating=max_rating,
+        year_from=year_from,
+        year_to=year_to,
+        min_vote=min_vote,
+        max_vote=max_vote,
+    )
+
+    return fragrance_service.count_brands(
+        name=name,
+        gender=gender,
+        accord=accord,
+        note=note,
+        min_rating=min_rating,
+        max_rating=max_rating,
+        year_from=year_from,
+        year_to=year_to,
+        min_vote=min_vote,
+        max_vote=max_vote,
+        sort_by=sort_by,
     )
 
 @router.get("/search", response_model=list[FragranceSearchResult])

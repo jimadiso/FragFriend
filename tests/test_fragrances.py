@@ -254,22 +254,112 @@ def test_cors_rejects_unknown_origin():
     assert "access-control-allow-origin" not in response.headers
 
 
-def test_search_brands(monkeypatch):
+def test_search_brands_forwards_filters_and_pagination(monkeypatch):
     brand_result = {
         "brand": "Dior",
-        "fragrance_count": 196,
-        "average_rating": 4.12,
+        "fragrance_count": 12,
+        "average_rating": 4.35,
     }
+    received = {}
+
+    def fake_search_brands(**kwargs):
+        received.update(kwargs)
+        return [brand_result]
 
     monkeypatch.setattr(
         fragrance_service,
         "search_brands",
-        lambda name, limit, offset: [brand_result],
+        fake_search_brands,
     )
 
     response = client.get(
-        "/fragrances/brands/search?name=Dior&limit=8&offset=0"
+        "/fragrances/brands/search"
+        "?name=Dior"
+        "&gender=Women"
+        "&accord=Floral"
+        "&accord=Fresh"
+        "&note=Rose"
+        "&note=Musk"
+        "&min_rating=4"
+        "&max_rating=5"
+        "&year_from=2010"
+        "&year_to=2026"
+        "&min_vote=100"
+        "&max_vote=10000"
+        "&sort_by=rating"
+        "&order=desc"
+        "&limit=8"
+        "&offset=8"
     )
 
     assert response.status_code == 200
     assert response.json() == [brand_result]
+    assert received == {
+        "name": "Dior",
+        "gender": "Women",
+        "accord": ["Floral", "Fresh"],
+        "note": ["Rose", "Musk"],
+        "min_rating": 4.0,
+        "max_rating": 5.0,
+        "year_from": 2010,
+        "year_to": 2026,
+        "min_vote": 100,
+        "max_vote": 10000,
+        "sort_by": "rating",
+        "order": "desc",
+        "limit": 8,
+        "offset": 8,
+    }
+
+
+def test_count_brands_forwards_filters(monkeypatch):
+    received = {}
+
+    def fake_count_brands(**kwargs):
+        received.update(kwargs)
+        return {"total": 17}
+
+    monkeypatch.setattr(
+        fragrance_service,
+        "count_brands",
+        fake_count_brands,
+    )
+
+    response = client.get(
+        "/fragrances/brands/search/count"
+        "?name=Dior"
+        "&gender=Men"
+        "&min_rating=4"
+        "&year_from=2020"
+        "&note=Bergamot"
+        "&sort_by=rating"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"total": 17}
+    assert received == {
+        "name": "Dior",
+        "gender": "Men",
+        "accord": [],
+        "note": ["Bergamot"],
+        "min_rating": 4.0,
+        "max_rating": None,
+        "year_from": 2020,
+        "year_to": None,
+        "min_vote": None,
+        "max_vote": None,
+        "sort_by": "rating",
+    }
+
+
+def test_search_brands_rejects_invalid_filter_range():
+    response = client.get(
+        "/fragrances/brands/search"
+        "?min_rating=4.5"
+        "&max_rating=3"
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "min_rating cannot be greater than max_rating"
+    }

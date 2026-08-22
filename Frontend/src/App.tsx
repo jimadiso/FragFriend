@@ -46,6 +46,11 @@ type SortOption =
   | 'popularity-desc'
   | 'popularity-asc'
 
+type BrandSortOption =
+  | 'count-desc'
+  | 'rating-desc'
+  | 'name-asc'
+
 type Fragrance = {
   id: number
   perfume: string
@@ -136,6 +141,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
   const [sortOption, setSortOption] = useState<SortOption>('rating-desc')
+  const [brandSortOption, setBrandSortOption] = useState<BrandSortOption>('count-desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
   const [hasNextPage, setHasNextPage] = useState(false)
@@ -733,6 +739,95 @@ function App() {
     }
   }
 
+  async function loadBrandPage( pageNumber: number, requestedSort = brandSortOption, ) {
+    setLoading(true)
+    setError('')
+
+    const trimmedQuery = query.trim()
+    const [sortBy, order] = requestedSort.split('-') as [
+      'count' | 'rating' | 'name',
+      'asc' | 'desc',
+    ]
+
+
+    try {
+      const parameters = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String((pageNumber - 1) * pageSize),
+        sort_by: sortBy,
+        order,
+      })
+
+      if (trimmedQuery) {
+        parameters.set('name', trimmedQuery)
+      }
+
+      if (minRating) parameters.set('min_rating', minRating)
+      if (maxRating) parameters.set('max_rating', maxRating)
+      if (yearFrom) parameters.set('year_from', yearFrom)
+      if (yearTo) parameters.set('year_to', yearTo)
+      if (gender) parameters.set('gender', gender)
+
+      accords.forEach((accord) => {
+        parameters.append('accord', accord)
+      })
+
+      notes.forEach((note) => {
+        parameters.append('note', note)
+      })
+
+      const countParameters = new URLSearchParams(parameters)
+      countParameters.delete('limit')
+      countParameters.delete('offset')
+      countParameters.delete('order')
+
+      const [response, countResponse] = await Promise.all([
+        fetch(
+          `http://127.0.0.1:8000/fragrances/brands/search?${parameters}`,
+        ),
+        fetch(
+          `http://127.0.0.1:8000/fragrances/brands/search/count?${countParameters}`,
+        ),
+      ])
+
+      if (!response.ok || !countResponse.ok) {
+        throw new Error('The brand search failed.')
+      }
+
+      const [data, countData]: [
+        BrandResult[],
+        { total: number },
+      ] = await Promise.all([
+        response.json(),
+        countResponse.json(),
+      ])
+
+      setBrands(data)
+      setFragrances([])
+      setSelectedBrand('')
+      setTotalResults(countData.total)
+      setHasNextPage(
+        pageNumber < Math.ceil(countData.total / pageSize),
+      )
+      setCurrentPage(pageNumber)
+      setPageInput(String(pageNumber))
+      setHasSearched(true)
+
+      return true
+    } catch {
+      setError(
+        'Could not connect to the FragFriend API. Make sure the backend is running.',
+      )
+      setBrands([])
+      setHasNextPage(false)
+      setTotalResults(0)
+
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function loadFragrancePage(
     pageNumber: number,
     brandName = selectedBrand,
@@ -856,31 +951,7 @@ function App() {
 
     try {
       if (searchMode === 'brand') {
-        const brandParameters = new URLSearchParams({
-          limit: '8',
-          offset: '0',
-        })
-
-        if (trimmedQuery) {
-          brandParameters.set('name', trimmedQuery)
-        }
-
-        const response = await fetch(
-          `http://127.0.0.1:8000/fragrances/brands/search?${brandParameters}`,
-        )
-
-        if (!response.ok) {
-          throw new Error('The brand search failed.')
-        }
-
-        const data: BrandResult[] = await response.json()
-
-        setBrands(data)
-        setFragrances([])
-        setSelectedBrand('')
-        setCurrentPage(1)
-        setHasNextPage(false)
-        setTotalResults(0)
+        await loadBrandPage(1)
         return
       }
 
@@ -920,16 +991,27 @@ function App() {
     )
   }
 
+  async function changeBrandSort(
+    nextSort: BrandSortOption,
+  ) {
+    setBrandSortOption(nextSort)
+    await loadBrandPage(1, nextSort)
+  }
+
   async function changePage(nextPage: number) {
     if (nextPage < 1 || loading) {
       return
     }
 
-    await loadFragrancePage(
-      nextPage,
-      selectedBrand,
-      sortOption,
-    )
+    if (showingBrandResults) {
+      await loadBrandPage(nextPage)
+    } else {
+      await loadFragrancePage(
+        nextPage,
+        selectedBrand,
+        sortOption,
+      )
+    }
 
     document
       .querySelector('.results-toolbar')
@@ -1849,6 +1931,44 @@ function App() {
           </div>
         )}
 
+        {showingBrandResults && brands.length > 0 && (
+          <div className="results-toolbar">
+            <div>
+              <p className="results-label">Brand results</p>
+
+              <p className="results-page">
+                Page {currentPage} of {totalPages} ·{' '}
+                {totalResults.toLocaleString()}{' '}
+                {totalResults === 1 ? 'brand' : 'brands'}
+              </p>
+            </div>
+
+            <label className="sort-control">
+              <span>Sort by</span>
+
+              <select
+                value={brandSortOption}
+                disabled={loading}
+                onChange={(event) =>
+                  void changeBrandSort(
+                    event.target.value as BrandSortOption,
+                  )
+                }
+              >
+                <option value="count-desc">
+                  Most matching fragrances
+                </option>
+                <option value="rating-desc">
+                  Highest-rated established brands
+                </option>
+                <option value="name-asc">
+                  Brand name A–Z
+                </option>
+              </select>
+            </label>
+          </div>
+        )}
+
         {searchMode === 'brand' &&
           !selectedBrand &&
           brands.map((brand) => (
@@ -1975,11 +2095,16 @@ function App() {
           </article>
         ))}
 
-        {(searchMode === 'name' || selectedBrand) &&
-          fragrances.length > 0 && (
+        {((showingBrandResults && brands.length > 0) ||
+          ((searchMode === 'name' || selectedBrand) &&
+            fragrances.length > 0)) && (
             <nav
               className="pagination"
-              aria-label="Fragrance result pages"
+              aria-label={
+                showingBrandResults
+                  ? 'Brand result pages'
+                  : 'Fragrance result pages'
+              }
             >
               <button
                 type="button"
