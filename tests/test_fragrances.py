@@ -30,6 +30,7 @@ SEARCH_RESULT = {
 
 DETAIL = {
     **SEARCH_RESULT,
+    "flat_notes": None,
     "url": "https://example.com/fragrance",
     "top_notes": "Water Notes, Sweet Pea",
     "middle_notes": "Peony, Freesia, Violet",

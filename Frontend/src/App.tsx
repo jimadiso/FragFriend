@@ -32,6 +32,12 @@ import {
   type FragranceCollectionDetail,
 } from './services/collectionApi'
 
+import {
+  discoverMoreFragrances,
+  discoverFragrances,
+  type DiscoveryResponse,
+} from './services/discoveryApi'
+
 import './App.css'
 
 type SearchMode = 'brand' | 'name'
@@ -65,6 +71,7 @@ type Fragrance = {
 
 type FragranceDetail = Fragrance & {
   url: string | null
+  flat_notes?: string | null
   top_notes: string | null
   middle_notes: string | null
   base_notes: string | null
@@ -94,6 +101,41 @@ const AUTH_TOKEN_STORAGE_KEY = 'fragfriend_access_token'
 const AUTH_USER_STORAGE_KEY = 'fragfriend_user'
 const API_BASE_URL = 'http://127.0.0.1:8000'
 
+function formatDiscoveryPreferences(
+  preferences: DiscoveryResponse['preferences'],
+) {
+  const labels: string[] = []
+
+  if (preferences.brand) labels.push(`Brand: ${preferences.brand}`)
+  if (preferences.gender) labels.push(preferences.gender)
+  preferences.notes.forEach((note) => labels.push(`Note: ${note}`))
+  preferences.accords.forEach((accord) => labels.push(`Accord: ${accord}`))
+  if (preferences.season) {
+    labels.push(
+      preferences.season.charAt(0).toUpperCase() + preferences.season.slice(1),
+    )
+  }
+  if (preferences.time_of_day) {
+    labels.push(
+      preferences.time_of_day.charAt(0).toUpperCase() + preferences.time_of_day.slice(1),
+    )
+  }
+  if (preferences.min_rating !== null) {
+    labels.push(`${preferences.min_rating.toFixed(1)}+ rating`)
+  }
+  if (preferences.prefer_popular) labels.push('Popular')
+  if (preferences.year_from !== null || preferences.year_to !== null) {
+    labels.push(
+      preferences.year_from !== null && preferences.year_to !== null
+        ? `${preferences.year_from}–${preferences.year_to}`
+        : preferences.year_from !== null
+          ? `${preferences.year_from}+`
+          : `Up to ${preferences.year_to}`,
+    )
+  }
+
+  return labels
+}
 
 function readStoredUser(): AuthUser | null {
   const storedUser = sessionStorage.getItem(
@@ -139,6 +181,15 @@ function App() {
   const [collectionFormError, setCollectionFormError] = useState('')
   const [searchMode, setSearchMode] = useState<SearchMode>('brand')
   const [query, setQuery] = useState('')
+  const [discoveryPrompt, setDiscoveryPrompt] = useState('')
+  const [discoveryOriginalPrompt, setDiscoveryOriginalPrompt] = useState('')
+  const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResponse | null>(null)
+  const [discoveryLoading, setDiscoveryLoading] = useState(false)
+  const [discoveryMoreLoading, setDiscoveryMoreLoading] = useState(false)
+  const [discoveryMoreAvailable, setDiscoveryMoreAvailable] = useState(false)
+  const [discoveryOffset, setDiscoveryOffset] = useState(0)
+  const [discoveryError, setDiscoveryError] = useState('')
+  const [discoveryOpen, setDiscoveryOpen] = useState(false)
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
   const [sortOption, setSortOption] = useState<SortOption>('rating-desc')
   const [brandSortOption, setBrandSortOption] = useState<BrandSortOption>('count-desc')
@@ -176,6 +227,7 @@ function App() {
   const skipNextSuggestionFetch = useRef(false)
   const searchFormRef = useRef<HTMLFormElement>(null)
   const [selectedFragrance, setSelectedFragrance] =  useState<FragranceDetail | null>(null)
+  const [selectedDiscoveryReasons, setSelectedDiscoveryReasons] = useState<string[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const [isBookmarked, setIsBookmarked] = useState(false)
@@ -574,9 +626,13 @@ function App() {
     }
   }
 
-  async function openFragranceDetails(id: number) {
+  async function openFragranceDetails(
+    id: number,
+    discoveryReasons: string[] = [],
+  ) {
     setDetailLoading(true)
     setDetailError('')
+    setSelectedDiscoveryReasons(discoveryReasons)
     setBookmarkError('')
     setIsBookmarked(false)
     setBookmarkLoading(false)
@@ -601,8 +657,99 @@ function App() {
     }
   }
 
+  async function handleDiscoverySubmit(
+    event: SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+
+    const trimmedPrompt = discoveryPrompt.trim()
+    if (trimmedPrompt.length < 3 || discoveryLoading) {
+      return
+    }
+
+    const request = discoveryOriginalPrompt
+      ? `Original request: ${discoveryOriginalPrompt}\nAdditional preference: ${trimmedPrompt}`
+      : trimmedPrompt
+
+    setDiscoveryLoading(true)
+    setDiscoveryError('')
+
+    try {
+      const response = await discoverFragrances(request)
+      setDiscoveryResult(response)
+      setDiscoveryOffset(response.matches.length)
+      setDiscoveryMoreAvailable(response.matches.length === 5)
+
+      if (response.follow_up_question) {
+        setDiscoveryOriginalPrompt(
+          discoveryOriginalPrompt || trimmedPrompt,
+        )
+        setDiscoveryPrompt('')
+      } else {
+        setDiscoveryOriginalPrompt('')
+      }
+    } catch (requestError) {
+      setDiscoveryError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Discovery is unavailable right now.',
+      )
+    } finally {
+      setDiscoveryLoading(false)
+    }
+  }
+
+  function startDiscoveryExample(example: string) {
+    setDiscoveryPrompt(example)
+    setDiscoveryError('')
+  }
+
+  function resetDiscovery() {
+    setDiscoveryPrompt('')
+    setDiscoveryOriginalPrompt('')
+    setDiscoveryResult(null)
+    setDiscoveryError('')
+    setDiscoveryMoreAvailable(false)
+    setDiscoveryOffset(0)
+    setDiscoveryOpen(false)
+  }
+
+  async function loadDifferentDiscoveryMatches() {
+    if (!discoveryResult || discoveryMoreLoading || !discoveryMoreAvailable) {
+      return
+    }
+
+    setDiscoveryMoreLoading(true)
+    setDiscoveryError('')
+
+    try {
+      const response = await discoverMoreFragrances(
+        discoveryResult.preferences,
+        discoveryOffset,
+      )
+
+      if (response.matches.length === 0) {
+        setDiscoveryMoreAvailable(false)
+        return
+      }
+
+      setDiscoveryResult(response)
+      setDiscoveryOffset((offset) => offset + response.matches.length)
+      setDiscoveryMoreAvailable(response.matches.length === 5)
+    } catch (requestError) {
+      setDiscoveryError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Could not load different matches. Please try again.',
+      )
+    } finally {
+      setDiscoveryMoreLoading(false)
+    }
+  }
+
   function closeFragranceDetails() {
     setSelectedFragrance(null)
+    setSelectedDiscoveryReasons([])
     setDetailError('')
     setBookmarkError('')
     setIsBookmarked(false)
@@ -1903,6 +2050,107 @@ function App() {
 
         </form>
 
+        <section className="discovery-panel" aria-labelledby="discovery-heading">
+          <button
+            type="button"
+            className="discovery-toggle"
+            aria-expanded={discoveryOpen}
+            aria-controls="discovery-content"
+            onClick={() => setDiscoveryOpen((isOpen) => !isOpen)}
+          >
+            <div>
+              <p className="discovery-kicker">AI fragrance discovery</p>
+              <h2 id="discovery-heading">What are you in the mood for?</h2>
+            </div>
+            <span className="discovery-chevron" aria-hidden="true">
+              <span className="discovery-chevron-icon">⌄</span>
+            </span>
+          </button>
+
+          {discoveryOpen && <div id="discovery-content" className="discovery-content">
+          {(discoveryResult || discoveryOriginalPrompt) && (
+            <button type="button" className="discovery-reset" onClick={resetDiscovery}>
+              Start over
+            </button>
+          )}
+
+          <form className="discovery-form" onSubmit={handleDiscoverySubmit}>
+            <label className="sr-only" htmlFor="discovery-prompt">
+              Describe the fragrance you want
+            </label>
+            <textarea
+              id="discovery-prompt"
+              value={discoveryPrompt}
+              onChange={(event) => setDiscoveryPrompt(event.target.value)}
+              placeholder={
+                discoveryResult?.follow_up_question
+                  ? discoveryResult.follow_up_question
+                  : 'Sweet for nighttime, fresh for summer, a woody scent for autumn...'
+              }
+              rows={2}
+              maxLength={600}
+            />
+            <button type="submit" disabled={discoveryLoading || discoveryPrompt.trim().length < 3}>
+              {discoveryLoading ? 'Finding matches…' : discoveryResult?.follow_up_question ? 'Continue' : 'Discover'}
+            </button>
+          </form>
+
+          {!discoveryResult && !discoveryLoading && (
+            <div className="discovery-examples" aria-label="Discovery examples">
+              {['Fresh citrus for summer days', 'Warm woody scent for autumn', 'Sweet fragrance for a night out'].map((example) => (
+                <button key={example} type="button" onClick={() => startDiscoveryExample(example)}>
+                  {example}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {discoveryError && <p className="discovery-error" role="alert">{discoveryError}</p>}
+          {discoveryResult?.follow_up_question && <p className="discovery-follow-up" role="status">{discoveryResult.follow_up_question}</p>}
+          {discoveryResult?.message && <p className="discovery-message" role="status">{discoveryResult.message}</p>}
+
+          {discoveryResult && discoveryResult.matches.length > 0 && (
+            <div className="discovery-results" aria-live="polite">
+              {formatDiscoveryPreferences(discoveryResult.preferences).length > 0 && (
+                <div className="discovery-preferences" aria-label="FragFriend understood">
+                  <span>FragFriend understood</span>
+                  <div>
+                    {formatDiscoveryPreferences(discoveryResult.preferences).map((label) => (
+                      <span key={label}>{label}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="discovery-results-heading">
+                <p className="discovery-results-label">Database matches</p>
+                {discoveryMoreAvailable && (
+                  <button
+                    type="button"
+                    className="discovery-refresh"
+                    onClick={() => void loadDifferentDiscoveryMatches()}
+                    disabled={discoveryMoreLoading}
+                    title="Show different matches"
+                  >
+                    <span aria-hidden="true">↻</span>
+                    {discoveryMoreLoading ? 'Loading…' : 'Different matches'}
+                  </button>
+                )}
+              </div>
+              <div className="discovery-match-grid">
+                {discoveryResult.matches.map(({ fragrance, why_matched }) => (
+                  <button key={fragrance.id} type="button" className="discovery-match" onClick={() => void openFragranceDetails(fragrance.id, why_matched)}>
+                    <span className="discovery-match-brand">{fragrance.brand}</span>
+                    <strong>{fragrance.perfume}</strong>
+                    {fragrance.rating_value !== null && <span className="discovery-match-rating">★ {fragrance.rating_value.toFixed(2)}</span>}
+                    <span className="discovery-reasons">{why_matched.join(' · ')}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          </div>}
+        </section>
+
         {error && <p className="error-message">{error}</p>}
       </section>
 
@@ -2690,6 +2938,17 @@ function App() {
                       ` from ${selectedFragrance.rating_count.toLocaleString()} votes`}
                   </p>
 
+                  {selectedDiscoveryReasons.length > 0 && (
+                    <section className="detail-ai-reasoning" aria-label="Why FragFriend chose this fragrance">
+                      <p>Why FragFriend chose this</p>
+                      <ul>
+                        {selectedDiscoveryReasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
                 <div className="detail-save-actions">
                   <div className="detail-bookmark-area">
                     <button
@@ -2808,6 +3067,17 @@ function App() {
                   </div>
                   </div>
 
+                  {selectedFragrance.flat_notes && (
+                    <div className="detail-notes">
+                      <div>
+                        <h3>Notes (pyramid not specified)</h3>
+                        <p>{selectedFragrance.flat_notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedFragrance.top_notes || selectedFragrance.middle_notes ||
+                    selectedFragrance.base_notes || !selectedFragrance.flat_notes) && (
                   <div className="detail-notes">
                     <div>
                       <h3>Top notes</h3>
@@ -2825,6 +3095,8 @@ function App() {
                     </div>
                   </div>
 
+                  )}
+
                   <div className="detail-accords">
                     <h3>Main accords</h3>
 
@@ -2840,7 +3112,15 @@ function App() {
                           (accord): accord is string => Boolean(accord),
                         )
                         .map((accord) => (
-                          <span key={accord}>{accord}</span>
+                          <span key={accord}>
+                            {accord
+                              .split(' ')
+                              .map(
+                                (word) =>
+                                  word.charAt(0).toUpperCase() + word.slice(1),
+                              )
+                              .join(' ')}
+                          </span>
                         ))}
                     </div>
                   </div>

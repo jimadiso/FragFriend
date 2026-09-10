@@ -8,13 +8,52 @@ from Backend.models.fragrance import (
     FragranceSummary,
     BrandSearchResult,
     FragranceCountResult,
+    DiscoveryRequest,
+    DiscoveryMoreRequest,
+    DiscoveryResponse,
 )
-from Backend.services import fragrance_service
+from Backend.services import discovery_service, fragrance_service
 
 router = APIRouter(
     prefix="/fragrances",
     tags=["Fragrances"]
 )
+
+
+@router.post("/discover", response_model=DiscoveryResponse)
+def discover_fragrances(payload: DiscoveryRequest):
+    try:
+        preferences = discovery_service.extract_preferences(payload.request)
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+    if discovery_service.needs_follow_up(preferences):
+        return DiscoveryResponse(
+            preferences=preferences,
+            follow_up_question=preferences.follow_up_question or discovery_service.FOLLOW_UP,
+        )
+
+    matches = discovery_service.search_database(preferences)
+    message = None
+    if not matches:
+        message = "No database fragrances matched those preferences. Try broadening a note, accord, rating, or year filter."
+    return DiscoveryResponse(
+        preferences=preferences,
+        matches=matches,
+        message=message,
+    )
+
+
+@router.post("/discover/more", response_model=DiscoveryResponse)
+def discover_more_fragrances(payload: DiscoveryMoreRequest):
+    matches = discovery_service.search_database(
+        payload.preferences,
+        offset=payload.offset,
+    )
+    return DiscoveryResponse(
+        preferences=payload.preferences,
+        matches=matches,
+    )
 
 @router.get("/", response_model=list[FragranceSummary])
 def get_fragrances(
