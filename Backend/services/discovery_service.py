@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from threading import Lock
+from time import monotonic
 
 from dotenv import load_dotenv
 from openai import APIConnectionError, APIError, AuthenticationError, OpenAI, RateLimitError
@@ -16,6 +18,9 @@ load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 MODEL = "gpt-5.6-luna"
 FOLLOW_UP = "What notes or scent style would you like, such as sweet, woody, floral, or fresh?"
+PREFERENCE_CACHE_TTL_SECONDS = 300
+_preference_cache: dict[str, tuple[float, DiscoveryPreferences]] = {}
+_preference_cache_lock = Lock()
 
 INSTRUCTIONS = """Extract fragrance-search preferences from the user's request.
 Return only the requested schema. Do not recommend any fragrance and do not invent
@@ -27,6 +32,37 @@ FragFriend has no occasion field, so never treat it as a database filter. Ask ex
 one useful follow-up only when there is no usable database preference among brand,
 gender, notes, accords, season, time_of_day, minimum rating, or year range. Otherwise set
 needs_follow_up false and follow_up_question null."""
+
+
+def _cache_key(request: str) -> str:
+    return " ".join(request.casefold().split())
+
+
+def get_cached_preferences(request: str) -> DiscoveryPreferences | None:
+    key = _cache_key(request)
+    now = monotonic()
+    with _preference_cache_lock:
+        cached = _preference_cache.get(key)
+        if cached is None:
+            return None
+        expires_at, preferences = cached
+        if expires_at <= now:
+            del _preference_cache[key]
+            return None
+        return preferences.model_copy(deep=True)
+
+
+def cache_preferences(request: str, preferences: DiscoveryPreferences) -> None:
+    with _preference_cache_lock:
+        _preference_cache[_cache_key(request)] = (
+            monotonic() + PREFERENCE_CACHE_TTL_SECONDS,
+            preferences.model_copy(deep=True),
+        )
+
+
+def clear_preference_cache() -> None:
+    with _preference_cache_lock:
+        _preference_cache.clear()
 
 
 def extract_preferences(request: str) -> DiscoveryPreferences:

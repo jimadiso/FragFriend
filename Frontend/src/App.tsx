@@ -188,6 +188,7 @@ function App() {
   const [discoveryMoreLoading, setDiscoveryMoreLoading] = useState(false)
   const [discoveryMoreAvailable, setDiscoveryMoreAvailable] = useState(false)
   const [discoveryOffset, setDiscoveryOffset] = useState(0)
+  const [hasDiscoveryRun, setHasDiscoveryRun] = useState(false)
   const [discoveryError, setDiscoveryError] = useState('')
   const [discoveryOpen, setDiscoveryOpen] = useState(false)
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
@@ -671,6 +672,7 @@ function App() {
       ? `Original request: ${discoveryOriginalPrompt}\nAdditional preference: ${trimmedPrompt}`
       : trimmedPrompt
 
+    setHasDiscoveryRun(true)
     setDiscoveryLoading(true)
     setDiscoveryError('')
 
@@ -711,7 +713,7 @@ function App() {
     setDiscoveryError('')
     setDiscoveryMoreAvailable(false)
     setDiscoveryOffset(0)
-    setDiscoveryOpen(false)
+    setHasDiscoveryRun(false)
   }
 
   async function loadDifferentDiscoveryMatches() {
@@ -2051,6 +2053,7 @@ function App() {
         </form>
 
         <section className="discovery-panel" aria-labelledby="discovery-heading">
+          <div className="discovery-heading-row">
           <button
             type="button"
             className="discovery-toggle"
@@ -2066,14 +2069,21 @@ function App() {
               <span className="discovery-chevron-icon">⌄</span>
             </span>
           </button>
+          </div>
 
-          {discoveryOpen && <div id="discovery-content" className="discovery-content">
-          {(discoveryResult || discoveryOriginalPrompt) && (
-            <button type="button" className="discovery-reset" onClick={resetDiscovery}>
-              Start over
+          {hasDiscoveryRun && discoveryOpen && (
+            <button
+              type="button"
+              className="discovery-reset"
+              aria-label="Clear AI discovery"
+              onClick={resetDiscovery}
+            >
+              <span aria-hidden="true">×</span>
+              Reset
             </button>
           )}
 
+          {discoveryOpen && <div id="discovery-content" className="discovery-content">
           <form className="discovery-form" onSubmit={handleDiscoverySubmit}>
             <label className="sr-only" htmlFor="discovery-prompt">
               Describe the fragrance you want

@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from Backend.main import app
+from Backend.routes import fragrances as fragrance_routes
 from Backend.models.fragrance import DiscoveryPreferences
 from Backend.services import discovery_service
 
@@ -39,6 +40,52 @@ def test_discovery_returns_only_database_matches(monkeypatch):
     assert response.json()["matches"] == [match]
 
 
+def test_discovery_reuses_cached_preferences(monkeypatch):
+    discovery_service.clear_preference_cache()
+    preferences = DiscoveryPreferences(accords=["sweet"])
+    calls = 0
+
+    def extract(request):
+        nonlocal calls
+        calls += 1
+        return preferences
+
+    monkeypatch.setattr(discovery_service, "extract_preferences", extract)
+    monkeypatch.setattr(discovery_service, "search_database", lambda parsed: [])
+
+    first = client.post("/fragrances/discover", json={"request": "sweet fragrance"})
+    second = client.post("/fragrances/discover", json={"request": "  Sweet   fragrance  "})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert calls == 1
+
+
+def test_discovery_limits_uncached_model_requests(monkeypatch):
+    discovery_service.clear_preference_cache()
+    fragrance_routes._discovery_attempts.clear()
+    monkeypatch.setattr(
+        discovery_service,
+        "extract_preferences",
+        lambda request: DiscoveryPreferences(accords=["sweet"]),
+    )
+    monkeypatch.setattr(discovery_service, "search_database", lambda parsed: [])
+
+    for index in range(fragrance_routes.DISCOVERY_RATE_LIMIT):
+        response = client.post(
+            "/fragrances/discover",
+            json={"request": f"sweet fragrance request {index}"},
+        )
+        assert response.status_code == 200
+
+    response = client.post(
+        "/fragrances/discover",
+        json={"request": "a different sweet fragrance request"},
+    )
+    assert response.status_code == 429
+    fragrance_routes._discovery_attempts.clear()
+
+
 def test_brand_is_a_usable_discovery_preference():
     assert not discovery_service.needs_follow_up(
         DiscoveryPreferences(brand="Dior"),
@@ -52,6 +99,7 @@ def test_popularity_is_a_usable_discovery_preference():
 
 
 def test_discovery_hides_provider_error_details(monkeypatch):
+    discovery_service.clear_preference_cache()
     monkeypatch.setattr(discovery_service, "extract_preferences", lambda request: (_ for _ in ()).throw(RuntimeError("OpenAI is unavailable right now. Please try again shortly.")))
     response = client.post("/fragrances/discover", json={"request": "sweet fragrance"})
     assert response.status_code == 503

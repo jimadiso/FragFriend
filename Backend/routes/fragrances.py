@@ -1,6 +1,8 @@
 from typing import Literal
+from collections import defaultdict, deque
+from time import monotonic
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from Backend.models.fragrance import (
     FragranceDetail,
@@ -19,13 +21,37 @@ router = APIRouter(
     tags=["Fragrances"]
 )
 
+DISCOVERY_RATE_LIMIT = 8
+DISCOVERY_RATE_WINDOW_SECONDS = 60
+_discovery_attempts: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _allow_uncached_discovery(client_id: str) -> bool:
+    now = monotonic()
+    attempts = _discovery_attempts[client_id]
+    while attempts and attempts[0] <= now - DISCOVERY_RATE_WINDOW_SECONDS:
+        attempts.popleft()
+    if len(attempts) >= DISCOVERY_RATE_LIMIT:
+        return False
+    attempts.append(now)
+    return True
+
 
 @router.post("/discover", response_model=DiscoveryResponse)
-def discover_fragrances(payload: DiscoveryRequest):
-    try:
-        preferences = discovery_service.extract_preferences(payload.request)
-    except RuntimeError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+def discover_fragrances(payload: DiscoveryRequest, request: Request):
+    preferences = discovery_service.get_cached_preferences(payload.request)
+    if preferences is None:
+        client_id = request.client.host if request.client else "unknown"
+        if not _allow_uncached_discovery(client_id):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many discovery requests. Please wait a minute before trying again.",
+            )
+        try:
+            preferences = discovery_service.extract_preferences(payload.request)
+        except RuntimeError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        discovery_service.cache_preferences(payload.request, preferences)
 
     if discovery_service.needs_follow_up(preferences):
         return DiscoveryResponse(
