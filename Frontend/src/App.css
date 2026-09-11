@@ -715,7 +715,7 @@
 .filter-panel {
   position: absolute;
   top: 44px;
-  transform: translateY(calc(-60% - 10px)) translateX(calc(50% + 10px));
+  transform: translateY(calc(-60% + 100px)) translateX(calc(50% + 10px));
   right: 0;
   z-index: 20;
   width: min(620px, 90vw);
@@ -832,6 +832,16 @@
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid rgba(91, 70, 56, 0.12);
+}
+
+.advanced-value {
+  display: none !important;
+}
+
+.main-scent-filters .advanced-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .advanced-filters summary {
@@ -1369,6 +1379,144 @@
 .collection-delete-button:disabled {
   cursor: wait;
   opacity: 0.6;
+}
+
+.saved-remove-action {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(168, 58, 45, 0.38);
+  border-radius: 50%;
+  color: #a83a2d;
+  background: #fffaf5;
+  box-shadow: 0 4px 14px rgba(45, 37, 32, 0.12);
+  font-size: 0;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.saved-remove-action::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.fragrance-card:hover .saved-remove-action,
+.fragrance-card:focus-within .saved-remove-action {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.saved-remove-action:hover,
+.saved-remove-action:focus-visible {
+  color: #fffaf5;
+  background: #a83a2d;
+  outline: none;
+}
+
+.saved-remove-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(45, 37, 32, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.saved-remove-dialog {
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(91, 70, 56, 0.18);
+  border-radius: 20px;
+  background: #fffaf5;
+  box-shadow: 0 24px 70px rgba(45, 37, 32, 0.3);
+}
+
+.saved-remove-dialog .eyebrow { margin: 0 0 8px; }
+.saved-remove-dialog h2 { margin: 0; color: #2d2520; font-family: Georgia, "Times New Roman", serif; font-size: 1.5rem; font-weight: 500; }
+.saved-remove-dialog p:not(.eyebrow) { margin: 12px 0 0; color: #756b64; line-height: 1.55; }
+.saved-remove-dialog .saved-remove-error { color: #a83a2d; font-weight: 700; }
+.saved-remove-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.saved-remove-actions button { padding: 10px 14px; border: 1px solid rgba(91, 70, 56, 0.22); border-radius: 999px; color: #5b4638; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
+.saved-remove-actions .confirm-saved-remove { border-color: #a83a2d; color: #fffaf6; background: #a83a2d; }
+
+.collection-delete-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(45, 37, 32, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.collection-delete-dialog {
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(91, 70, 56, 0.18);
+  border-radius: 20px;
+  background: #fffaf5;
+  box-shadow: 0 24px 70px rgba(45, 37, 32, 0.3);
+}
+
+.collection-delete-dialog .eyebrow {
+  margin: 0 0 8px;
+}
+
+.collection-delete-dialog h3 {
+  margin: 0;
+  color: #2d2520;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.collection-delete-dialog p:not(.eyebrow) {
+  margin: 12px 0 0;
+  color: #756b64;
+  line-height: 1.55;
+}
+
+.collection-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.collection-delete-actions button {
+  padding: 10px 14px;
+  border: 1px solid rgba(91, 70, 56, 0.22);
+  border-radius: 999px;
+  color: #5b4638;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collection-delete-actions .confirm-collection-delete {
+  border-color: #a83a2d;
+  color: #fffaf6;
+  background: #a83a2d;
 }
 
 .collection-delete-button:focus-visible {
@@ -2246,14 +2394,40 @@
   gap: 7px;
 }
 
-.discovery-preferences > div > span {
+.discovery-preferences > div > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 6px 9px;
   border: 1px solid rgba(255, 250, 246, 0.22);
   border-radius: 999px;
   color: #fffaf6;
   background: rgba(255, 250, 246, 0.09);
+  font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
+  cursor: pointer;
+}
+
+.discovery-preferences > div > button:hover:not(:disabled) {
+  border-color: #edba92;
+  background: rgba(255, 250, 246, 0.18);
+}
+
+.discovery-preferences > div > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.discovery-preferences > div > button:focus-visible {
+  outline: 3px solid rgba(255, 224, 200, 0.72);
+  outline-offset: 2px;
+}
+
+.discovery-preferences > div > button span {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 0.75;
 }
 
 .discovery-results-label {
@@ -2443,3 +2617,54 @@
     width: 100%;
   }
 }
+
+/* Recommendations float above nearby cards without affecting their dimensions. */
+.fragrance-card:hover, .fragrance-card:focus-within { z-index: 5; }
+.search-ai-bubble {
+  position: absolute;
+  z-index: 10;
+  left: calc(100% + 12px);
+  top: 25%;
+  width: 230px;
+  padding: 18px;
+  border: 1px solid #e4d8cf;
+  border-radius: 20px;
+  background: #fffaf5;
+  box-shadow: 0 12px 32px #39291f30;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  font-size: .85rem;
+}
+.search-ai-bubble::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 30px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fffaf5;
+  box-shadow: -9px 10px 0 -3px #fffaf5;
+}
+.fragrance-card:hover > .search-ai-bubble,
+.fragrance-card:focus-within > .search-ai-bubble { visibility: visible; opacity: 1; }
+.search-ai-bubble-left {
+  left: auto;
+  right: calc(100% + 12px);
+}
+
+.search-ai-bubble-left::before {
+  right: -10px;
+  left: auto;
+  box-shadow: 9px 10px 0 -3px #fffaf5;
+}
+@media (max-width: 1100px) {
+  .fragrance-card > .search-ai-bubble,
+  .search-ai-bubble-left {
+    left: 12px; right: 12px; top: 20px; width: auto;
+  }
+}
+
+.fragrance-card { position: relative; overflow: visible; }

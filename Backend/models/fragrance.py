@@ -50,6 +50,11 @@ class DiscoveryRequest(BaseModel):
 class DiscoveryMoreRequest(BaseModel):
     preferences: "DiscoveryPreferences"
     offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=8, ge=1, le=50)
+    name: str = Field(default="", max_length=200)
+    max_rating: float | None = Field(default=None, ge=0, le=5)
+    sort_by: Literal["rating", "year", "popularity"] = "rating"
+    order: Literal["asc", "desc"] = "desc"
 
 
 class DiscoveryPreferences(BaseModel):
@@ -61,6 +66,7 @@ class DiscoveryPreferences(BaseModel):
     time_of_day: Literal["day", "night"] | None = None
     occasion: str | None = Field(default=None, max_length=80)
     min_rating: float | None = Field(default=None, ge=0, le=5)
+    min_votes: int | None = Field(default=None, ge=0)
     prefer_popular: bool = False
     year_from: int | None = Field(default=None, ge=1700, le=2027)
     year_to: int | None = Field(default=None, ge=1700, le=2027)
@@ -74,6 +80,7 @@ class DiscoveryMatch(BaseModel):
 
 
 class DiscoveryResponse(BaseModel):
+    total: int = 0
     preferences: DiscoveryPreferences
     follow_up_question: str | None = None
     matches: list[DiscoveryMatch] = Field(default_factory=list)

@@ -57,6 +57,14 @@ def remove_bookmark(
     user_id: int,
     fragrance_id: int,
 ) -> bool:
+    remove_from_collections_sql = """
+        DELETE FROM collection_fragrances
+        WHERE fragrance_id = :fragrance_id
+          AND collection_id IN (
+              SELECT id FROM fragrance_collections
+              WHERE user_id = :user_id
+          )
+    """
     sql = """
         DELETE FROM bookmarks
         WHERE user_id = :user_id
@@ -64,6 +72,13 @@ def remove_bookmark(
     """
 
     with engine.begin() as connection:
+        connection.execute(
+            text(remove_from_collections_sql),
+            {
+                "user_id": user_id,
+                "fragrance_id": fragrance_id,
+            },
+        )
         result = connection.execute(
             text(sql),
             {

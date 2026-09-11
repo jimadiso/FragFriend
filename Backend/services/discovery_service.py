@@ -27,10 +27,11 @@ Return only the requested schema. Do not recommend any fragrance and do not inve
 database facts. Extract a brand when the user names or asks for one. Use only Women,
 Men, or Unisex for gender. Extract notes and accords as short lowercase search terms.
 Set prefer_popular true when the user asks for popular, widely loved, well-known,
-or most reviewed fragrances. Map fall to autumn. An occasion is context only:
+ or most reviewed fragrances. Extract a minimum vote count when the request says
+"at least 1,000 votes", "above 1000 reviews", or similar. Map fall to autumn. An occasion is context only:
 FragFriend has no occasion field, so never treat it as a database filter. Ask exactly
 one useful follow-up only when there is no usable database preference among brand,
-gender, notes, accords, season, time_of_day, minimum rating, or year range. Otherwise set
+gender, notes, accords, season, time_of_day, minimum rating, minimum vote count, or year range. Otherwise set
 needs_follow_up false and follow_up_question null."""
 
 
@@ -102,6 +103,7 @@ def needs_follow_up(preferences: DiscoveryPreferences) -> bool:
         preferences.season,
         preferences.time_of_day,
         preferences.min_rating is not None,
+        preferences.min_votes is not None,
         preferences.prefer_popular,
         preferences.year_from is not None,
         preferences.year_to is not None,
@@ -126,6 +128,8 @@ def _reasons(row: dict, preferences: DiscoveryPreferences) -> list[str]:
         reasons.append(f"Listed for {preferences.gender.lower()}.")
     if preferences.min_rating is not None and row["rating_value"] is not None:
         reasons.append(f"Rated {float(row['rating_value']):.2f}, meeting your minimum rating.")
+    if preferences.min_votes is not None and row["rating_count"] is not None:
+        reasons.append(f"Has {row['rating_count']:,} ratings, meeting your {preferences.min_votes:,}+ vote minimum.")
     if preferences.prefer_popular and row["rating_count"] is not None:
         reasons.append(f"Popular with {row['rating_count']:,} community ratings.")
     if preferences.year_from is not None and row["year"] is not None:
@@ -143,9 +147,20 @@ def search_database(
     preferences: DiscoveryPreferences,
     limit: int = 5,
     offset: int = 0,
-) -> list[dict]:
+    name: str = "",
+    max_rating: float | None = None,
+    sort_by: str | None = None,
+    order: str = "desc",
+    count_only: bool = False,
+) -> list[dict] | int:
     conditions = ["1=1"]
     params: dict[str, object] = {"limit": limit, "offset": offset}
+    if name:
+        conditions.append("(f.perfume ILIKE :name OR f.brand ILIKE :name)")
+        params["name"] = f"%{name.strip()}%"
+    if max_rating is not None:
+        conditions.append("f.rating_value <= :max_rating")
+        params["max_rating"] = max_rating
     if preferences.brand:
         conditions.append("f.brand ILIKE :brand")
         params["brand"] = f"%{preferences.brand.strip()}%"
@@ -163,6 +178,9 @@ def search_database(
     if preferences.min_rating is not None:
         conditions.append("f.rating_value >= :min_rating")
         params["min_rating"] = preferences.min_rating
+    if preferences.min_votes is not None:
+        conditions.append("COALESCE(f.rating_count, 0) >= :min_votes")
+        params["min_votes"] = preferences.min_votes
     if preferences.year_from is not None:
         conditions.append("f.year >= :year_from")
         params["year_from"] = preferences.year_from
@@ -180,6 +198,14 @@ def search_database(
         if preferences.prefer_popular
         else "season_votes DESC, daypart_votes DESC, f.rating_value DESC NULLS LAST, f.rating_count DESC NULLS LAST, f.perfume ASC"
     )
+    if sort_by is not None:
+        column = {"rating": "f.rating_value", "year": "f.year", "popularity": "f.rating_count"}[sort_by]
+        direction = "ASC" if order == "asc" else "DESC"
+        order_by = f"{column} {direction} NULLS LAST, f.perfume ASC"
+    order_by += ", f.id ASC"
+    if count_only:
+        with engine.connect() as connection:
+            return connection.execute(text(f"SELECT count(*) FROM fragrances f LEFT JOIN fragrance_source_metadata m ON m.fragrance_id = f.id WHERE {' AND '.join(conditions)}"), params).scalar_one()
     query = f"""
         SELECT f.id, f.perfume, f.brand, f.country, f.gender, f.rating_value,
                f.rating_count, f.year, f.image_url, f.mainaccord1, f.mainaccord2,

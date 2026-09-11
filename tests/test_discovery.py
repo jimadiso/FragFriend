@@ -104,3 +104,56 @@ def test_discovery_hides_provider_error_details(monkeypatch):
     response = client.post("/fragrances/discover", json={"request": "sweet fragrance"})
     assert response.status_code == 503
     assert response.json()["detail"] == "OpenAI is unavailable right now. Please try again shortly."
+
+
+def test_discovery_pagination_uses_filters_for_results_and_total(monkeypatch):
+    calls = []
+    def search(preferences, **options):
+        calls.append((preferences, options))
+        return 23 if options.get("count_only") else []
+    monkeypatch.setattr(discovery_service, "search_database", search)
+    def unexpected_model_call(*args):
+        raise AssertionError("Paging must not call the model")
+    monkeypatch.setattr(discovery_service, "extract_preferences", unexpected_model_call)
+    response = client.post("/fragrances/discover/more", json={
+        "preferences": {"brand": "Dior", "accords": ["fresh"], "season": "summer", "min_votes": 1000},
+        "offset": 8, "limit": 8, "name": "Homme", "max_rating": 4.8,
+        "sort_by": "popularity", "order": "desc",
+    })
+    assert response.status_code == 200
+    assert response.json()["total"] == 23
+    assert calls[0][0].brand == "Dior"
+    assert calls[0][0].min_votes == 1000
+    assert calls[0][1] == {"limit": 8, "offset": 8, "name": "Homme", "max_rating": 4.8, "sort_by": "popularity", "order": "desc"}
+    assert calls[1][1] == {**calls[0][1], "count_only": True}
+
+
+def test_discovery_page_rejects_invalid_filter_ranges():
+    response = client.post("/fragrances/discover/more", json={
+        "preferences": {"min_rating": 4}, "max_rating": 3,
+    })
+    assert response.status_code == 422
+
+
+def test_database_discovery_filters_by_minimum_votes(monkeypatch):
+    executed = []
+
+    class Connection:
+        def execute(self, statement, params):
+            executed.append((str(statement), params))
+            return []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(discovery_service.engine, "connect", lambda: Connection())
+
+    assert discovery_service.search_database(
+        DiscoveryPreferences(min_votes=1000),
+    ) == []
+    statement, parameters = executed[0]
+    assert "COALESCE(f.rating_count, 0) >= :min_votes" in statement
+    assert parameters["min_votes"] == 1000

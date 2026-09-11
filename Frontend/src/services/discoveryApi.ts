@@ -13,6 +13,7 @@ export type DiscoveryFragrance = {
 }
 
 export type DiscoveryResponse = {
+  total: number
   preferences: {
     brand: string | null
     gender: 'Women' | 'Men' | 'Unisex' | null
@@ -22,6 +23,7 @@ export type DiscoveryResponse = {
     time_of_day: 'day' | 'night' | null
     occasion: string | null
     min_rating: number | null
+    min_votes: number | null
     prefer_popular: boolean
     year_from: number | null
     year_to: number | null
@@ -58,11 +60,12 @@ export async function discoverFragrances(
 export async function discoverMoreFragrances(
   preferences: DiscoveryResponse['preferences'],
   offset: number,
+  options: { limit: number; name: string; max_rating: number | null; sort_by: string; order: string },
 ): Promise<DiscoveryResponse> {
   const response = await fetch(`${API_BASE_URL}/fragrances/discover/more`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ preferences, offset }),
+    body: JSON.stringify({ preferences, offset, ...options }),
   })
 
   if (!response.ok) {

@@ -72,13 +72,20 @@ def discover_fragrances(payload: DiscoveryRequest, request: Request):
 
 @router.post("/discover/more", response_model=DiscoveryResponse)
 def discover_more_fragrances(payload: DiscoveryMoreRequest):
+    if payload.preferences.min_rating is not None and payload.max_rating is not None and payload.preferences.min_rating > payload.max_rating:
+        raise HTTPException(status_code=422, detail="Minimum rating exceeds maximum rating.")
+    if payload.preferences.year_from is not None and payload.preferences.year_to is not None and payload.preferences.year_from > payload.preferences.year_to:
+        raise HTTPException(status_code=422, detail="Starting year exceeds ending year.")
+    options = dict(limit=payload.limit, offset=payload.offset, name=payload.name,
+                   max_rating=payload.max_rating, sort_by=payload.sort_by, order=payload.order)
     matches = discovery_service.search_database(
         payload.preferences,
-        offset=payload.offset,
+        **options,
     )
     return DiscoveryResponse(
         preferences=payload.preferences,
         matches=matches,
+        total=discovery_service.search_database(payload.preferences, count_only=True, **options),
     )
 
 @router.get("/", response_model=list[FragranceSummary])
@@ -237,6 +244,8 @@ def search_fragrances(
     year_to: int | None = Query(None, ge=1700, le=2027),
     min_vote: int | None = Query(None, ge=0),
     max_vote: int | None = Query(None, ge=0),
+    season: Literal["winter", "spring", "summer", "autumn"] | None = None,
+    time_of_day: Literal["day", "night"] | None = None,
     order: Literal['asc', 'desc'] = 'asc',
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0)   
@@ -285,6 +294,8 @@ def search_fragrances(
         year_to=year_to,
         min_vote=min_vote,
         max_vote=max_vote,
+        season=season,
+        time_of_day=time_of_day,
         order=order,
         limit=limit,
         offset=offset
@@ -304,6 +315,8 @@ def count_fragrances(
     year_to: int | None = Query(None, ge=1700, le=2027),
     min_vote: int | None = Query(None, ge=0),
     max_vote: int | None = Query(None, ge=0),
+    season: Literal["winter", "spring", "summer", "autumn"] | None = None,
+    time_of_day: Literal["day", "night"] | None = None,
 ):
     if (
         min_rating is not None
@@ -348,6 +361,8 @@ def count_fragrances(
         year_to=year_to,
         min_vote=min_vote,
         max_vote=max_vote,
+        season=season,
+        time_of_day=time_of_day,
     )
 
 @router.get(

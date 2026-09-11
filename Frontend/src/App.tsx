@@ -101,40 +101,75 @@ const AUTH_TOKEN_STORAGE_KEY = 'fragfriend_access_token'
 const AUTH_USER_STORAGE_KEY = 'fragfriend_user'
 const API_BASE_URL = 'http://127.0.0.1:8000'
 
-function formatDiscoveryPreferences(
+type DiscoveryPreferenceChip = {
+  key: string
+  label: string
+}
+
+function toScentTitle(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase())
+}
+
+function getDiscoveryPreferenceChips(
   preferences: DiscoveryResponse['preferences'],
 ) {
-  const labels: string[] = []
+  const chips: DiscoveryPreferenceChip[] = []
 
-  if (preferences.brand) labels.push(`Brand: ${preferences.brand}`)
-  if (preferences.gender) labels.push(preferences.gender)
-  preferences.notes.forEach((note) => labels.push(`Note: ${note}`))
-  preferences.accords.forEach((accord) => labels.push(`Accord: ${accord}`))
+  if (preferences.brand) chips.push({ key: 'brand', label: `Brand: ${preferences.brand}` })
+  if (preferences.gender) chips.push({ key: 'gender', label: preferences.gender })
+  preferences.notes.forEach((note, index) => chips.push({ key: `note-${index}`, label: `Note: ${toScentTitle(note)}` }))
+  preferences.accords.forEach((accord, index) => chips.push({ key: `accord-${index}`, label: `Accord: ${toScentTitle(accord)}` }))
   if (preferences.season) {
-    labels.push(
-      preferences.season.charAt(0).toUpperCase() + preferences.season.slice(1),
-    )
+    chips.push({ key: 'season', label: preferences.season.charAt(0).toUpperCase() + preferences.season.slice(1) })
   }
   if (preferences.time_of_day) {
-    labels.push(
-      preferences.time_of_day.charAt(0).toUpperCase() + preferences.time_of_day.slice(1),
-    )
+    chips.push({ key: 'time-of-day', label: preferences.time_of_day.charAt(0).toUpperCase() + preferences.time_of_day.slice(1) })
   }
   if (preferences.min_rating !== null) {
-    labels.push(`${preferences.min_rating.toFixed(1)}+ rating`)
+    chips.push({ key: 'min-rating', label: `${preferences.min_rating.toFixed(1)}+ rating` })
   }
-  if (preferences.prefer_popular) labels.push('Popular')
+  if (preferences.min_votes !== null) {
+    chips.push({ key: 'min-votes', label: `${preferences.min_votes.toLocaleString()}+ votes` })
+  }
+  if (preferences.prefer_popular) chips.push({ key: 'popular', label: 'Popular' })
   if (preferences.year_from !== null || preferences.year_to !== null) {
-    labels.push(
-      preferences.year_from !== null && preferences.year_to !== null
+    chips.push({
+      key: 'year-range',
+      label: preferences.year_from !== null && preferences.year_to !== null
         ? `${preferences.year_from}–${preferences.year_to}`
         : preferences.year_from !== null
           ? `${preferences.year_from}+`
           : `Up to ${preferences.year_to}`,
-    )
+    })
   }
 
-  return labels
+  return chips
+}
+
+function removeDiscoveryPreference(
+  preferences: DiscoveryResponse['preferences'],
+  key: string,
+) {
+  if (key === 'brand') return { ...preferences, brand: null }
+  if (key === 'gender') return { ...preferences, gender: null }
+  if (key === 'season') return { ...preferences, season: null }
+  if (key === 'time-of-day') return { ...preferences, time_of_day: null }
+  if (key === 'min-rating') return { ...preferences, min_rating: null }
+  if (key === 'min-votes') return { ...preferences, min_votes: null }
+  if (key === 'popular') return { ...preferences, prefer_popular: false }
+  if (key === 'year-range') return { ...preferences, year_from: null, year_to: null }
+  if (key.startsWith('note-')) {
+    const index = Number(key.slice('note-'.length))
+    return { ...preferences, notes: preferences.notes.filter((_, itemIndex) => itemIndex !== index) }
+  }
+  if (key.startsWith('accord-')) {
+    const index = Number(key.slice('accord-'.length))
+    return { ...preferences, accords: preferences.accords.filter((_, itemIndex) => itemIndex !== index) }
+  }
+  return preferences
 }
 
 function readStoredUser(): AuthUser | null {
@@ -163,6 +198,9 @@ function App() {
   const [savedFragrances, setSavedFragrances] = useState<BookmarkedFragrance[]>([])
   const [savedLoading, setSavedLoading] = useState(false)
   const [savedError, setSavedError] = useState('')
+  const [savedRemovalTarget, setSavedRemovalTarget] = useState<BookmarkedFragrance | null>(null)
+  const [savedRemovalLoading, setSavedRemovalLoading] = useState(false)
+  const [savedRemovalError, setSavedRemovalError] = useState('')
   const [collections, setCollections] = useState<FragranceCollection[]>([])
   const [collectionsLoading, setCollectionsLoading] = useState(false)
   const [collectionsError, setCollectionsError] = useState('')
@@ -175,6 +213,7 @@ function App() {
   const [collectionSubmitting, setCollectionSubmitting] = useState(false)
   const [collectionPickerOpen, setCollectionPickerOpen] = useState(false)
   const [collectionDeleting, setCollectionDeleting] = useState(false)
+  const [collectionDeleteConfirmOpen, setCollectionDeleteConfirmOpen] = useState(false)
   const [collectionActionLoadingId, setCollectionActionLoadingId] = useState<number | null>(null)
   const [collectionActionError, setCollectionActionError] = useState('')
   const [collectionActionMessage, setCollectionActionMessage] = useState('')
@@ -185,14 +224,19 @@ function App() {
   const [discoveryOriginalPrompt, setDiscoveryOriginalPrompt] = useState('')
   const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResponse | null>(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
-  const [discoveryMoreLoading, setDiscoveryMoreLoading] = useState(false)
-  const [discoveryMoreAvailable, setDiscoveryMoreAvailable] = useState(false)
-  const [discoveryOffset, setDiscoveryOffset] = useState(0)
+  const [aiSearch, setAiSearch] = useState(false)
+  const [aiBrand, setAiBrand] = useState('')
+  const [aiSeason, setAiSeason] = useState<DiscoveryResponse['preferences']['season']>(null)
+  const [aiDaypart, setAiDaypart] = useState<DiscoveryResponse['preferences']['time_of_day']>(null)
+  const [aiMinVotes, setAiMinVotes] = useState('')
+  const [matchReasons, setMatchReasons] = useState<Record<number, string[]>>({})
+  const searchGeneration = useRef(0)
+  const [discoveryPreferencesLoading, setDiscoveryPreferencesLoading] = useState(false)
   const [hasDiscoveryRun, setHasDiscoveryRun] = useState(false)
   const [discoveryError, setDiscoveryError] = useState('')
   const [discoveryOpen, setDiscoveryOpen] = useState(false)
   const [fragrances, setFragrances] = useState<Fragrance[]>([])
-  const [sortOption, setSortOption] = useState<SortOption>('rating-desc')
+  const [sortOption, setSortOption] = useState<SortOption>('popularity-desc')
   const [brandSortOption, setBrandSortOption] = useState<BrandSortOption>('count-desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
@@ -218,7 +262,7 @@ function App() {
   const [filterOptionType, setFilterOptionType] = useState<'accords' | 'notes' | null>(null)
   const [filterOptions, setFilterOptions] = useState<string[]>([])
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
-  const activeFilterCount = [minRating, maxRating, yearFrom, yearTo, gender].filter(Boolean).length +   accords.length +  notes.length
+  const activeFilterCount = [minRating, maxRating, yearFrom, yearTo, gender, aiBrand, aiSeason, aiDaypart, aiMinVotes].filter(Boolean).length + accords.length + notes.length
   const [brands, setBrands] = useState<BrandResult[]>([])
   const [selectedBrand, setSelectedBrand] = useState('')
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([])
@@ -679,8 +723,6 @@ function App() {
     try {
       const response = await discoverFragrances(request)
       setDiscoveryResult(response)
-      setDiscoveryOffset(response.matches.length)
-      setDiscoveryMoreAvailable(response.matches.length === 5)
 
       if (response.follow_up_question) {
         setDiscoveryOriginalPrompt(
@@ -689,6 +731,12 @@ function App() {
         setDiscoveryPrompt('')
       } else {
         setDiscoveryOriginalPrompt('')
+        syncDiscoveryFilters(response.preferences)
+        setQuery('')
+        setMaxRating('')
+        const nextSort = 'popularity-desc'
+        setSortOption(nextSort)
+        await loadAiPage(1, response.preferences, nextSort, '', '')
       }
     } catch (requestError) {
       setDiscoveryError(
@@ -711,41 +759,91 @@ function App() {
     setDiscoveryOriginalPrompt('')
     setDiscoveryResult(null)
     setDiscoveryError('')
-    setDiscoveryMoreAvailable(false)
-    setDiscoveryOffset(0)
     setHasDiscoveryRun(false)
   }
 
-  async function loadDifferentDiscoveryMatches() {
-    if (!discoveryResult || discoveryMoreLoading || !discoveryMoreAvailable) {
+  async function removeAppliedDiscoveryPreference(key: string) {
+    if (!discoveryResult || discoveryPreferencesLoading) {
       return
     }
 
-    setDiscoveryMoreLoading(true)
+    const preferences = removeDiscoveryPreference(
+      discoveryResult.preferences,
+      key,
+    )
+    setDiscoveryPreferencesLoading(true)
     setDiscoveryError('')
 
     try {
-      const response = await discoverMoreFragrances(
-        discoveryResult.preferences,
-        discoveryOffset,
-      )
-
-      if (response.matches.length === 0) {
-        setDiscoveryMoreAvailable(false)
-        return
-      }
-
-      setDiscoveryResult(response)
-      setDiscoveryOffset((offset) => offset + response.matches.length)
-      setDiscoveryMoreAvailable(response.matches.length === 5)
+      syncDiscoveryFilters(preferences)
+      const nextSort = sortOption
+      setSortOption(nextSort)
+      await loadAiPage(1, preferences, nextSort, query, maxRating)
     } catch (requestError) {
       setDiscoveryError(
         requestError instanceof Error
           ? requestError.message
-          : 'Could not load different matches. Please try again.',
+          : 'Could not update the discovery preferences. Please try again.',
       )
     } finally {
-      setDiscoveryMoreLoading(false)
+      setDiscoveryPreferencesLoading(false)
+    }
+  }
+
+  function syncDiscoveryFilters(preferences: DiscoveryResponse['preferences']) {
+    setAiSearch(true)
+    setSearchMode('name')
+    setSelectedBrand('')
+    setBrands([])
+    setSuggestionsOpen(false)
+    setAiBrand(preferences.brand || '')
+    setAiSeason(preferences.season)
+    setAiDaypart(preferences.time_of_day)
+    setAiMinVotes(preferences.min_votes?.toString() || '')
+    setMinRating(preferences.min_rating?.toString() || '')
+    setYearFrom(preferences.year_from?.toString() || '')
+    setYearTo(preferences.year_to?.toString() || '')
+    setGender(preferences.gender || '')
+    setNotes(preferences.notes)
+    setAccords(preferences.accords)
+  }
+
+  function currentAiPreferences(sort: SortOption): DiscoveryResponse['preferences'] {
+    return {
+      brand: aiBrand || null, gender: (gender || null) as DiscoveryResponse['preferences']['gender'],
+      season: aiSeason, time_of_day: aiDaypart, notes, accords,
+      min_rating: minRating ? Number(minRating) : null,
+      min_votes: aiMinVotes ? Number(aiMinVotes) : null,
+      year_from: yearFrom ? Number(yearFrom) : null, year_to: yearTo ? Number(yearTo) : null,
+      prefer_popular: sort === 'popularity-desc', occasion: null,
+      needs_follow_up: false, follow_up_question: null,
+    }
+  }
+
+  async function loadAiPage(page: number, preferences: DiscoveryResponse['preferences'], sort: SortOption, name: string, maximum: string) {
+    const generation = ++searchGeneration.current
+    setLoading(true)
+    setError('')
+    try {
+      const { sortBy, order } = getSortParameters(sort)
+      const response = await discoverMoreFragrances(preferences, (page - 1) * pageSize, {
+        limit: pageSize, name, max_rating: maximum ? Number(maximum) : null, sort_by: sortBy, order,
+      })
+      if (generation !== searchGeneration.current) return false
+      setDiscoveryResult(response)
+      setFragrances(response.matches.map(match => match.fragrance))
+      setMatchReasons(Object.fromEntries(response.matches.map(match => [match.fragrance.id, match.why_matched])))
+      setTotalResults(response.total)
+      setHasNextPage(page * pageSize < response.total)
+      setCurrentPage(page)
+      setPageInput(String(page))
+      setHasSearched(true)
+      return true
+    } catch {
+      if (generation === searchGeneration.current) setError('Could not load these matches. Check the filters and try again.')
+      return false
+    } finally {
+      if (generation === searchGeneration.current) setLoading(false)
     }
   }
 
@@ -799,6 +897,32 @@ function App() {
       )
     } finally {
       setBookmarkLoading(false)
+    }
+  }
+
+  async function confirmSavedFragranceRemoval() {
+    if (!savedRemovalTarget || savedRemovalLoading) return
+
+    const fragranceId = savedRemovalTarget.id
+    setSavedRemovalLoading(true)
+    setSavedRemovalError('')
+
+    try {
+      await removeBookmark(fragranceId)
+      setSavedFragrances((current) => current.filter((fragrance) => fragrance.id !== fragranceId))
+      setSelectedCollection((current) => current
+        ? { ...current, fragrances: current.fragrances.filter((fragrance) => fragrance.id !== fragranceId) }
+        : null)
+      setSavedRemovalTarget(null)
+      try {
+        setCollections(await getCollections())
+      } catch {
+        // The removal succeeded even if collection counts could not refresh.
+      }
+    } catch (requestError) {
+      setSavedRemovalError(requestError instanceof Error ? requestError.message : 'We could not remove this fragrance from Saved.')
+    } finally {
+      setSavedRemovalLoading(false)
     }
   }
 
@@ -913,6 +1037,7 @@ function App() {
 
       if (minRating) parameters.set('min_rating', minRating)
       if (maxRating) parameters.set('max_rating', maxRating)
+      if (aiMinVotes) parameters.set('min_vote', aiMinVotes)
       if (yearFrom) parameters.set('year_from', yearFrom)
       if (yearTo) parameters.set('year_to', yearTo)
       if (gender) parameters.set('gender', gender)
@@ -982,6 +1107,8 @@ function App() {
     brandName = selectedBrand,
     requestedSort = sortOption,
   ) {
+    if (aiSearch) return loadAiPage(pageNumber, currentAiPreferences(requestedSort), requestedSort, query, maxRating)
+    setMatchReasons({})
     setLoading(true)
     setError('')
 
@@ -998,15 +1125,20 @@ function App() {
 
       if (brandName) {
         parameters.set('brand', brandName)
+      } else if (aiBrand) {
+        parameters.set('brand', aiBrand)
       } else if (trimmedQuery) {
         parameters.set('name', trimmedQuery)
       }
 
       if (minRating) parameters.set('min_rating', minRating)
       if (maxRating) parameters.set('max_rating', maxRating)
+      if (aiMinVotes) parameters.set('min_vote', aiMinVotes)
       if (yearFrom) parameters.set('year_from', yearFrom)
       if (yearTo) parameters.set('year_to', yearTo)
       if (gender) parameters.set('gender', gender)
+      if (aiSeason) parameters.set('season', aiSeason)
+      if (aiDaypart) parameters.set('time_of_day', aiDaypart)
       accords.forEach((accord) => {
         parameters.append('accord', accord)
       })
@@ -1071,7 +1203,7 @@ function App() {
 
     const hasActiveFilters = activeFilterCount > 0
 
-    if (!trimmedQuery && !hasActiveFilters) {
+    if (!trimmedQuery && !hasActiveFilters && !aiSearch) {
       setError('Enter a brand, fragrance, or select at least one filter.')
       return
     }
@@ -1188,6 +1320,9 @@ function App() {
   }
 
   function changeSearchMode(mode: SearchMode) {
+    searchGeneration.current += 1
+    setAiSearch(false)
+    setMatchReasons({})
     setSearchMode(mode)
     setQuery('')
     setFragrances([])
@@ -1210,7 +1345,7 @@ function App() {
   ) {
     const newValues = rawValue
       .split(',')
-      .map((value) => value.trim())
+      .map((value) => toScentTitle(value))
       .filter(Boolean)
 
     if (newValues.length === 0) {
@@ -1302,6 +1437,10 @@ function App() {
   }
 
   function clearFilters() {
+    setAiBrand('')
+    setAiSeason(null)
+    setAiDaypart(null)
+    setAiMinVotes('')
     setMinRating('')
     setMaxRating('')
     setYearFrom('')
@@ -1311,6 +1450,25 @@ function App() {
     setAccordInput('')
     setNotes([])
     setNoteInput('')
+    setDiscoveryResult((current) => current
+      ? {
+          ...current,
+          preferences: {
+            ...current.preferences,
+            brand: null,
+            gender: null,
+            notes: [],
+            accords: [],
+            season: null,
+            time_of_day: null,
+            min_rating: null,
+            min_votes: null,
+            prefer_popular: false,
+            year_from: null,
+            year_to: null,
+          },
+        }
+      : null)
     closeFilterOptions()
     setError('')
   }
@@ -1401,6 +1559,7 @@ function App() {
   function closeCollection() {
     setSelectedCollection(null)
     setSelectedCollectionError('')
+    setCollectionDeleteConfirmOpen(false)
   }
 
   async function removeSelectedCollectionFragrance(
@@ -1468,22 +1627,12 @@ function App() {
     }
   }
 
-  async function handleDeleteSelectedCollection() {
+  async function confirmDeleteSelectedCollection() {
     if (!selectedCollection || collectionDeleting) {
       return
     }
 
     const collectionId = selectedCollection.id
-    const collectionNameToDelete = selectedCollection.name
-
-    const confirmed = window.confirm(
-      `Delete "${collectionNameToDelete}"? The fragrances will remain in All saved fragrances.`,
-    )
-
-    if (!confirmed) {
-      return
-    }
-
     setCollectionDeleting(true)
     setSelectedCollectionError('')
 
@@ -1497,6 +1646,7 @@ function App() {
       )
 
       setSelectedCollection(null)
+      setCollectionDeleteConfirmOpen(false)
     } catch (requestError) {
       setSelectedCollectionError(
         requestError instanceof Error
@@ -1798,7 +1948,13 @@ function App() {
               </div>
 
               <div className="filter-grid">
-                <label className="filter-field">
+                <>
+                  <label className="filter-field"><span>Brand</span><input value={aiBrand} onChange={event => setAiBrand(event.target.value)} placeholder="Any brand" /></label>
+                  <label className="filter-field"><span>Season</span><select value={aiSeason || ''} onChange={event => setAiSeason((event.target.value || null) as typeof aiSeason)}><option value="">Any season</option>{['winter','spring','summer','autumn'].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+                  <label className="filter-field"><span>Time of day</span><select value={aiDaypart || ''} onChange={event => setAiDaypart((event.target.value || null) as typeof aiDaypart)}><option value="">Any time</option><option value="day">Day</option><option value="night">Night</option></select></label>
+                </>
+
+                <label className="filter-field advanced-value">
                   <span>Minimum rating</span>
                   <select
                     value={minRating}
@@ -1813,7 +1969,7 @@ function App() {
                   </select>
                 </label>
 
-                <label className="filter-field">
+                <label className="filter-field advanced-value">
                   <span>Maximum rating</span>
                   <select
                     value={maxRating}
@@ -1829,7 +1985,7 @@ function App() {
                   </select>
                 </label>
 
-                <label className="filter-field">
+                <label className="filter-field advanced-value">
                   <span>Starting year</span>
                   <input
                     type="number"
@@ -1841,7 +1997,7 @@ function App() {
                   />
                 </label>
 
-                <label className="filter-field">
+                <label className="filter-field advanced-value">
                   <span>Ending year</span>
                   <input
                     type="number"
@@ -1867,8 +2023,7 @@ function App() {
                 </label>
               </div>
 
-              <details className="advanced-filters">
-                <summary>Advanced filters</summary>
+              <div className="main-scent-filters">
 
                 <div className="advanced-filter-grid">
                   <div className="filter-field filter-multiselect">
@@ -1879,11 +2034,11 @@ function App() {
                     <div className="filter-tag-input">
                       {accords.map((accord) => (
                         <span className="filter-tag" key={accord}>
-                          {accord}
+                          {toScentTitle(accord)}
 
                           <button
                             type="button"
-                            aria-label={`Remove ${accord}`}
+                            aria-label={`Remove ${toScentTitle(accord)}`}
                             onClick={() =>
                               removeFilterValue('accords', accord)
                             }
@@ -1962,11 +2117,11 @@ function App() {
                     <div className="filter-tag-input">
                       {notes.map((note) => (
                         <span className="filter-tag" key={note}>
-                          {note}
+                          {toScentTitle(note)}
 
                           <button
                             type="button"
-                            aria-label={`Remove ${note}`}
+                            aria-label={`Remove ${toScentTitle(note)}`}
                             onClick={() =>
                               removeFilterValue('notes', note)
                             }
@@ -2036,6 +2191,16 @@ function App() {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+              <details className="advanced-filters">
+                <summary>Advanced filters</summary>
+                <div className="advanced-filter-grid">
+                  <label className="filter-field"><span>Minimum votes</span><input type="number" min="0" value={aiMinVotes} onChange={(event) => setAiMinVotes(event.target.value)} placeholder="Any number of votes" /></label>
+                  <label className="filter-field"><span>Minimum rating</span><select value={minRating} onChange={(event) => setMinRating(event.target.value)}><option value="">Any rating</option><option value="2">2.0+</option><option value="3">3.0+</option><option value="3.5">3.5+</option><option value="4">4.0+</option><option value="4.5">4.5+</option></select></label>
+                  <label className="filter-field"><span>Maximum rating</span><select value={maxRating} onChange={(event) => setMaxRating(event.target.value)}><option value="">Any rating</option><option value="2">Up to 2.0</option><option value="3">Up to 3.0</option><option value="3.5">Up to 3.5</option><option value="4">Up to 4.0</option><option value="4.5">Up to 4.5</option><option value="5">Up to 5.0</option></select></label>
+                  <label className="filter-field"><span>Starting year</span><input type="number" min="1700" max="2027" value={yearFrom} placeholder="1900" onChange={(event) => setYearFrom(event.target.value)} /></label>
+                  <label className="filter-field"><span>Ending year</span><input type="number" min="1700" max="2027" value={yearTo} placeholder="2027" onChange={(event) => setYearTo(event.target.value)} /></label>
                 </div>
               </details>
               <div className="filter-footer">
@@ -2119,43 +2284,27 @@ function App() {
           {discoveryResult?.follow_up_question && <p className="discovery-follow-up" role="status">{discoveryResult.follow_up_question}</p>}
           {discoveryResult?.message && <p className="discovery-message" role="status">{discoveryResult.message}</p>}
 
-          {discoveryResult && discoveryResult.matches.length > 0 && (
+          {discoveryResult && !discoveryResult.follow_up_question && (
             <div className="discovery-results" aria-live="polite">
-              {formatDiscoveryPreferences(discoveryResult.preferences).length > 0 && (
+              {getDiscoveryPreferenceChips(discoveryResult.preferences).length > 0 && (
                 <div className="discovery-preferences" aria-label="FragFriend understood">
-                  <span>FragFriend understood</span>
+                  <span>{discoveryPreferencesLoading ? 'Updating search' : 'FragFriend understood'}</span>
                   <div>
-                    {formatDiscoveryPreferences(discoveryResult.preferences).map((label) => (
-                      <span key={label}>{label}</span>
+                    {getDiscoveryPreferenceChips(discoveryResult.preferences).map((chip) => (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        disabled={loading || discoveryLoading || discoveryPreferencesLoading}
+                        aria-label={`Remove ${chip.label} preference`}
+                        onClick={() => void removeAppliedDiscoveryPreference(chip.key)}
+                      >
+                        {chip.label}
+                        <span aria-hidden="true">×</span>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
-              <div className="discovery-results-heading">
-                <p className="discovery-results-label">Database matches</p>
-                {discoveryMoreAvailable && (
-                  <button
-                    type="button"
-                    className="discovery-refresh"
-                    onClick={() => void loadDifferentDiscoveryMatches()}
-                    disabled={discoveryMoreLoading}
-                    title="Show different matches"
-                  >
-                    <span aria-hidden="true">↻</span>
-                    {discoveryMoreLoading ? 'Loading…' : 'Different matches'}
-                  </button>
-                )}
-              </div>
-              <div className="discovery-match-grid">
-                {discoveryResult.matches.map(({ fragrance, why_matched }) => (
-                  <button key={fragrance.id} type="button" className="discovery-match" onClick={() => void openFragranceDetails(fragrance.id, why_matched)}>
-                    <span className="discovery-match-brand">{fragrance.brand}</span>
-                    <strong>{fragrance.perfume}</strong>
-                    {fragrance.rating_value !== null && <span className="discovery-match-rating">★ {fragrance.rating_value.toFixed(2)}</span>}
-                    <span className="discovery-reasons">{why_matched.join(' · ')}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
           </div>}
@@ -2306,8 +2455,9 @@ function App() {
             </div>
           )}
 
-        {(searchMode === 'name' || selectedBrand) && fragrances.map((fragrance) => (
+        {(searchMode === 'name' || selectedBrand) && fragrances.map((fragrance, index) => (
           <article className="fragrance-card" key={fragrance.id}>
+            {matchReasons[fragrance.id]?.length > 0 && <aside className={`search-ai-bubble ${index % 4 < 2 ? 'search-ai-bubble-left' : ''}`} aria-label="Why this matches"><strong>Why this matches</strong>{matchReasons[fragrance.id].map(reason => <p key={reason}>{reason}</p>)}</aside>}
             <div className="fragrance-image-wrapper">
               {fragrance.image_url ? (
                 <img
@@ -2346,7 +2496,7 @@ function App() {
             <button
               type="button"
               className="card-action"
-              onClick={() => openFragranceDetails(fragrance.id)}
+              onClick={() => openFragranceDetails(fragrance.id, matchReasons[fragrance.id] || [])}
             >
               View more info →
             </button>
@@ -2503,6 +2653,17 @@ function App() {
                       className="fragrance-card"
                       key={fragrance.id}
                     >
+                      <button
+                        type="button"
+                        className="saved-remove-action"
+                        aria-label={`Remove ${fragrance.perfume} from Saved`}
+                        onClick={() => {
+                          setSavedRemovalError('')
+                          setSavedRemovalTarget(fragrance)
+                        }}
+                      >
+                        −
+                      </button>
                       <div className="fragrance-image-wrapper">
                         {fragrance.image_url ? (
                           <img
@@ -2777,9 +2938,7 @@ function App() {
                     <button
                       type="button"
                       className="collection-delete-button"
-                      onClick={() =>
-                        void handleDeleteSelectedCollection()
-                      }
+                      onClick={() => setCollectionDeleteConfirmOpen(true)}
                       disabled={collectionDeleting}
                     >
                       {collectionDeleting
@@ -2787,6 +2946,38 @@ function App() {
                         : 'Delete collection'}
                     </button>
                   </header>
+
+                  {collectionDeleteConfirmOpen && (
+                    <div
+                      className="collection-delete-backdrop"
+                      onClick={() => setCollectionDeleteConfirmOpen(false)}
+                    >
+                      <section
+                        className="collection-delete-dialog"
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-collection-title"
+                        aria-describedby="delete-collection-description"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <p className="eyebrow">Delete collection</p>
+                        <h3 id="delete-collection-title">
+                          Are you sure you want to delete this collection?
+                        </h3>
+                        <p id="delete-collection-description">
+                          “{selectedCollection.name}” will be removed. Its fragrances will remain in All saved fragrances.
+                        </p>
+                        <div className="collection-delete-actions">
+                          <button type="button" onClick={() => setCollectionDeleteConfirmOpen(false)} disabled={collectionDeleting}>
+                            Cancel
+                          </button>
+                          <button type="button" className="confirm-collection-delete" onClick={() => void confirmDeleteSelectedCollection()} disabled={collectionDeleting}>
+                            {collectionDeleting ? 'Deleting…' : 'Delete collection'}
+                          </button>
+                        </div>
+                      </section>
+                    </div>
+                  )}
 
                   {selectedCollection.fragrances.length === 0 ? (
                     <p className="saved-message">
@@ -3081,7 +3272,7 @@ function App() {
                     <div className="detail-notes">
                       <div>
                         <h3>Notes (pyramid not specified)</h3>
-                        <p>{selectedFragrance.flat_notes}</p>
+                        <p>{toScentTitle(selectedFragrance.flat_notes)}</p>
                       </div>
                     </div>
                   )}
@@ -3091,17 +3282,17 @@ function App() {
                   <div className="detail-notes">
                     <div>
                       <h3>Top notes</h3>
-                      <p>{selectedFragrance.top_notes || 'Not listed'}</p>
+                      <p>{selectedFragrance.top_notes ? toScentTitle(selectedFragrance.top_notes) : 'Not listed'}</p>
                     </div>
 
                     <div>
                       <h3>Middle notes</h3>
-                      <p>{selectedFragrance.middle_notes || 'Not listed'}</p>
+                      <p>{selectedFragrance.middle_notes ? toScentTitle(selectedFragrance.middle_notes) : 'Not listed'}</p>
                     </div>
 
                     <div>
                       <h3>Base notes</h3>
-                      <p>{selectedFragrance.base_notes || 'Not listed'}</p>
+                      <p>{selectedFragrance.base_notes ? toScentTitle(selectedFragrance.base_notes) : 'Not listed'}</p>
                     </div>
                   </div>
 
@@ -3123,13 +3314,7 @@ function App() {
                         )
                         .map((accord) => (
                           <span key={accord}>
-                            {accord
-                              .split(' ')
-                              .map(
-                                (word) =>
-                                  word.charAt(0).toUpperCase() + word.slice(1),
-                              )
-                              .join(' ')}
+                            {toScentTitle(accord)}
                           </span>
                         ))}
                     </div>
@@ -3170,6 +3355,22 @@ function App() {
           onClose={() => setAuthModalOpen(false)}
           onAuthenticated={handleAuthenticated}
         />
+      )}
+      {savedRemovalTarget && (
+        <div className="saved-remove-backdrop" onClick={() => !savedRemovalLoading && setSavedRemovalTarget(null)}>
+          <section className="saved-remove-dialog" role="alertdialog" aria-modal="true" aria-labelledby="saved-remove-title" aria-describedby="saved-remove-description" onClick={(event) => event.stopPropagation()}>
+            <p className="eyebrow">Remove fragrance</p>
+            <h2 id="saved-remove-title">Remove from Saved fragrances?</h2>
+            <p id="saved-remove-description">“{savedRemovalTarget.perfume}” will be removed from Saved fragrances and every collection it belongs to.</p>
+            {savedRemovalError && <p className="saved-remove-error" role="alert">{savedRemovalError}</p>}
+            <div className="saved-remove-actions">
+              <button type="button" onClick={() => setSavedRemovalTarget(null)} disabled={savedRemovalLoading}>Cancel</button>
+              <button type="button" className="confirm-saved-remove" onClick={() => void confirmSavedFragranceRemoval()} disabled={savedRemovalLoading}>
+                {savedRemovalLoading ? 'Removing…' : 'Remove fragrance'}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
     </main>
   )

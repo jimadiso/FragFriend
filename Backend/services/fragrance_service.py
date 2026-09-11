@@ -276,13 +276,16 @@ def search_fragrances(
     year_to: int = None,
     min_vote: int = None,
     max_vote: int = None,
+    season: str = None,
+    time_of_day: str = None,
     limit: int = 20,
     offset: int = 0
 ):
     query = """
-        SELECT id, perfume, brand, country, gender, rating_value, rating_count, year, image_url,
-               mainaccord1, mainaccord2, mainaccord3, mainaccord4, mainaccord5
-        FROM fragrances
+        SELECT f.id, f.perfume, f.brand, f.country, f.gender, f.rating_value, f.rating_count, f.year, f.image_url,
+               f.mainaccord1, f.mainaccord2, f.mainaccord3, f.mainaccord4, f.mainaccord5
+        FROM fragrances f
+        LEFT JOIN fragrance_source_metadata m ON m.fragrance_id = f.id
         WHERE 1=1
     """
 
@@ -377,6 +380,14 @@ def search_fragrances(
     if max_vote is not None:
         query += " AND rating_count <= :max_vote"
         params["max_vote"] = max_vote
+
+    if season:
+        query += " AND COALESCE((m.attributes -> 'seasons' ->> :season)::integer, 0) > 0"
+        params["season"] = season
+
+    if time_of_day:
+        query += " AND COALESCE((m.attributes -> 'daypart' ->> :time_of_day)::integer, 0) > 0"
+        params["time_of_day"] = time_of_day
     
     if sort_by:
         column = allowed_sort_columns.get(sort_by.lower())
@@ -406,10 +417,13 @@ def count_fragrances(
     year_to: int = None,
     min_vote: int = None,
     max_vote: int = None,
+    season: str = None,
+    time_of_day: str = None,
 ):
     query = """
         SELECT COUNT(*) AS total
-        FROM fragrances
+        FROM fragrances f
+        LEFT JOIN fragrance_source_metadata m ON m.fragrance_id = f.id
         WHERE 1=1
     """
 
@@ -495,6 +509,14 @@ def count_fragrances(
         query += " AND rating_count <= :max_vote"
         params["max_vote"] = max_vote
 
+    if season:
+        query += " AND COALESCE((m.attributes -> 'seasons' ->> :season)::integer, 0) > 0"
+        params["season"] = season
+
+    if time_of_day:
+        query += " AND COALESCE((m.attributes -> 'daypart' ->> :time_of_day)::integer, 0) > 0"
+        params["time_of_day"] = time_of_day
+
     with engine.connect() as conn:
         total = conn.execute(text(query), params).scalar_one()
         return {"total": total}
@@ -513,17 +535,17 @@ def get_filter_options(
         sql = """
             SELECT value
             FROM (
-                SELECT TRIM(mainaccord1) AS value FROM fragrances
+                SELECT INITCAP(LOWER(TRIM(mainaccord1))) AS value FROM fragrances
                 UNION
-                SELECT TRIM(mainaccord2) AS value FROM fragrances
+                SELECT INITCAP(LOWER(TRIM(mainaccord2))) AS value FROM fragrances
                 UNION
-                SELECT TRIM(mainaccord3) AS value FROM fragrances
+                SELECT INITCAP(LOWER(TRIM(mainaccord3))) AS value FROM fragrances
                 UNION
-                SELECT TRIM(mainaccord4) AS value FROM fragrances
+                SELECT INITCAP(LOWER(TRIM(mainaccord4))) AS value FROM fragrances
                 UNION
-                SELECT TRIM(mainaccord5) AS value FROM fragrances
+                SELECT INITCAP(LOWER(TRIM(mainaccord5))) AS value FROM fragrances
                 UNION
-                SELECT TRIM(value) FROM fragrances
+                SELECT INITCAP(LOWER(TRIM(value))) FROM fragrances
                 CROSS JOIN LATERAL unnest(string_to_array(
                     to_jsonb(fragrances)->>'accords_all', ','
                 )) AS value
@@ -536,7 +558,7 @@ def get_filter_options(
         """
     elif option_type == "notes":
         sql = """
-            SELECT DISTINCT TRIM(note_value) AS value
+            SELECT DISTINCT INITCAP(LOWER(TRIM(note_value))) AS value
             FROM fragrances
             CROSS JOIN LATERAL unnest(
                 string_to_array(

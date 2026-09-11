@@ -171,6 +171,30 @@ def test_get_note_filter_options(monkeypatch):
     assert response.status_code == 200
     assert response.json() == ["Vanilla", "Vanilla Flower"]
 
+
+def test_filter_options_are_canonicalized_by_the_database_query(monkeypatch):
+    executed_sql = []
+
+    class Result:
+        def __iter__(self):
+            return iter([])
+
+    class Connection:
+        def execute(self, statement, params):
+            executed_sql.append(str(statement))
+            return Result()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(fragrance_service.engine, "connect", lambda: Connection())
+
+    assert fragrance_service.get_filter_options("accords") == []
+    assert "INITCAP(LOWER(TRIM(mainaccord1)))" in executed_sql[0]
+
 def test_get_fragrance_by_id(monkeypatch):
     monkeypatch.setattr(
         fragrance_service,
