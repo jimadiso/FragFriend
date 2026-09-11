@@ -1786,7 +1786,20 @@ function App() {
         hidden={appView !== 'search'}
       >
         <p className="eyebrow">FragFriend</p>
-        <h1>Find <span className="headline-emphasis">your</span> next scent</h1>
+        <h1>
+          Find{' '}
+          <span className="headline-emphasis headline-emphasis-wave">
+            {['y', 'o', 'u', 'r'].map((letter, index) => (
+              <span
+                key={letter}
+                style={{ animationDelay: `${index * 110}ms` }}
+              >
+                {letter}
+              </span>
+            ))}
+          </span>{' '}
+          next scent
+        </h1>
         <p className="introduction">
           Search the fragrance collection by{' '}{searchMode === 'brand' ? 'brand' : 'fragrance'} name.
         </p>
@@ -2248,7 +2261,11 @@ function App() {
             </button>
           )}
 
-          {discoveryOpen && <div id="discovery-content" className="discovery-content">
+          <div
+            id="discovery-content"
+            className={`discovery-content ${discoveryOpen ? 'is-open' : ''}`}
+            aria-hidden={!discoveryOpen}
+          >
           <form className="discovery-form" onSubmit={handleDiscoverySubmit}>
             <label className="sr-only" htmlFor="discovery-prompt">
               Describe the fragrance you want
@@ -2307,7 +2324,7 @@ function App() {
               )}
             </div>
           )}
-          </div>}
+          </div>
         </section>
 
         {error && <p className="error-message">{error}</p>}

@@ -101,11 +101,30 @@
 .eyebrow {
   margin: 0 0 18px;
   color: #8a6045;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
+
+/* .search-section > .eyebrow {
+  animation: brand-mark-glow 4s ease-in-out infinite;
+}
+
+@keyframes brand-mark-glow {
+  0%,
+  100% {
+    color: #8a6045;
+    letter-spacing: 0.2em;
+    text-shadow: 0 0 0 rgba(206, 145, 107, 0);
+  }
+
+  50% {
+    color: #c98761;
+    letter-spacing: 0.23em;
+    text-shadow: 0 0 10px rgba(206, 145, 107, 0.34);
+  }
+} */
 
 .search-section h1 {
   margin: 0;
@@ -1024,6 +1043,28 @@
   color: #986c50;
   font-style: italic;
   font-weight: 500;
+}
+
+.headline-emphasis-wave {
+  display: inline-flex;
+}
+
+.headline-emphasis-wave span {
+  display: inline-block;
+  transform-origin: center bottom;
+  animation: hero-your-wave 7s ease-in-out infinite;
+}
+
+@keyframes hero-your-wave {
+  0%,
+  18%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  9% {
+    transform: translateY(-3px) scale(1.12);
+  }
 }
 
 .brand-card {
@@ -2182,14 +2223,36 @@
 .discovery-kicker,
 .manual-search-label {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: .9rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .discovery-kicker {
-  color: #e7c3a9;
+  color: transparent;
+  background: linear-gradient(
+    105deg,
+    #b97858 0%,
+    #d69b78 32%,
+    #fff5e9 48%,
+    #d69b78 63%,
+    #b97858 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: discovery-kicker-shine 3.6s linear infinite;
+}
+
+@keyframes discovery-kicker-shine {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -40% 0;
+  }
 }
 
 .discovery-toggle h2 {
@@ -2244,7 +2307,25 @@
 
 .discovery-content {
   position: relative;
+  max-height: 0;
+  padding: 0 20px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-14px);
+  transition:
+    max-height 340ms ease,
+    padding 340ms ease,
+    opacity 180ms ease,
+    transform 340ms ease;
+}
+
+.discovery-content.is-open {
+  max-height: 900px;
   padding: 0 20px 20px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .discovery-form {
@@ -2668,3 +2749,14 @@
 }
 
 .fragrance-card { position: relative; overflow: visible; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
