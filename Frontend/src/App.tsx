@@ -1735,6 +1735,10 @@ function App() {
               Hello, {currentUser.display_name}
             </span>
 
+            <button type="button" className="search-navigation-button" aria-label="Go to Search" title="Search" onClick={() => navigatePage('search')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+            </button>
+
             <button
               type="button"
               className="bookmark-navigation-button"
@@ -1742,14 +1746,10 @@ function App() {
               title="Collections"
               onClick={() => navigatePage('saved')}
             >
-                <span
-                  className="bookmark-ribbon-icon"
-                  aria-hidden="true"
-                />
-            </button>
-
-            <button type="button" className="search-navigation-button" aria-label="Go to Search" title="Search" onClick={() => navigatePage('search')}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+              <span
+                className="bookmark-ribbon-icon"
+                aria-hidden="true"
+              />
             </button>
 
             <button type="button" onClick={signOut}>
