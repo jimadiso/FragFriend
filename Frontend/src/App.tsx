@@ -7,6 +7,8 @@ import {
 } from 'react'
 
 import { AuthModal } from './components/AuthModal'
+import { BladeNavigation } from './components/BladeNavigation'
+import { useBladePages, type BladePage } from './components/useBladePages'
 import type {
   AuthMode,
   AuthResponse,
@@ -41,7 +43,6 @@ import {
 import './App.css'
 
 type SearchMode = 'brand' | 'name'
-type AppView = 'search' | 'saved'
 type SavedTab = 'all' | 'collections'
 
 type SortOption =
@@ -193,7 +194,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(readStoredUser)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
-  const [appView, setAppView] = useState<AppView>('search')
+  const { page: appView, navigate: setAppView, surface: bladeSurface } = useBladePages()
   const [savedTab, setSavedTab] = useState<SavedTab>('all')
   const [savedFragrances, setSavedFragrances] = useState<BookmarkedFragrance[]>([])
   const [savedLoading, setSavedLoading] = useState(false)
@@ -1501,8 +1502,7 @@ function App() {
     }
 
     setAppView('saved')
-    setSavedTab('all')
-    setSavedLoading(true)
+    setSavedLoading(savedFragrances.length === 0)
     setSavedError('')
 
     try {
@@ -1717,8 +1717,17 @@ function App() {
     setAppView('search')
   }
 
+  function navigatePage(page: BladePage) {
+    if (page === appView) return
+    setFiltersOpen(false)
+    if (page === 'saved') void openSavedLibrary()
+    else setAppView(page)
+  }
+
   return (
     <main className="app">
+      <BladeNavigation page={appView} onNavigate={navigatePage}
+        disabled={authModalOpen || filtersOpen || detailLoading || Boolean(detailError) || Boolean(selectedFragrance) || selectedCollectionLoading || Boolean(selectedCollectionError) || Boolean(selectedCollection) || Boolean(savedRemovalTarget)} />
       <header className="account-header">
                 {currentUser ? (
           <div className="account-session">
@@ -1728,35 +1737,19 @@ function App() {
 
             <button
               type="button"
-              className={
-                appView === 'saved'
-                  ? ''
-                  : 'bookmark-navigation-button'
-              }
-              aria-label={
-                appView === 'saved'
-                  ? 'Back to search'
-                  : 'Open saved fragrances'
-              }
-              title={
-                appView === 'saved'
-                  ? 'Back to search'
-                  : 'Saved fragrances'
-              }
-              onClick={
-                appView === 'saved'
-                  ? () => setAppView('search')
-                  : openSavedLibrary
-              }
+              className="bookmark-navigation-button"
+              aria-label="Go to Collections"
+              title="Collections"
+              onClick={() => navigatePage('saved')}
             >
-              {appView === 'saved' ? (
-                'Back to search'
-              ) : (
                 <span
                   className="bookmark-ribbon-icon"
                   aria-hidden="true"
                 />
-              )}
+            </button>
+
+            <button type="button" className="search-navigation-button" aria-label="Go to Search" title="Search" onClick={() => navigatePage('search')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
             </button>
 
             <button type="button" onClick={signOut}>
@@ -1782,6 +1775,7 @@ function App() {
           </div>
         )}
       </header>
+      <div ref={bladeSurface} className="blade-surface" tabIndex={-1} role="region" aria-label={appView === 'search' ? 'Search page' : 'Collections page'}>
       <section
         className="search-section"
         hidden={appView !== 'search'}
@@ -2915,6 +2909,7 @@ function App() {
           </>
         )}
       </section>
+      </div>
       {(selectedCollectionLoading ||
         selectedCollectionError ||
         selectedCollection) && (
