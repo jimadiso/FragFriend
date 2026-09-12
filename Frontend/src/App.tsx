@@ -1963,8 +1963,8 @@ function App() {
 
               <div className="filter-grid">
                 <>
-                  <label className="filter-field"><span>Brand</span><input value={aiBrand} onChange={event => setAiBrand(event.target.value)} placeholder="Any brand" /></label>
-                  <label className="filter-field"><span>Season</span><select value={aiSeason || ''} onChange={event => setAiSeason((event.target.value || null) as typeof aiSeason)}><option value="">Any season</option>{['winter','spring','summer','autumn'].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+                  <label className="filter-field"><span>Minimum votes</span><input type="number" min="0" value={aiMinVotes} onChange={(event) => setAiMinVotes(event.target.value)} placeholder="Any number of votes" /></label>
+                  <label className="filter-field"><span>Season</span><select value={aiSeason || ''} onChange={event => setAiSeason((event.target.value || null) as typeof aiSeason)}><option value="">Any Season</option>{['winter','spring','summer','autumn'].map(value => <option key={value} value={value}>{toScentTitle(value)}</option>)}</select></label>
                   <label className="filter-field"><span>Time of day</span><select value={aiDaypart || ''} onChange={event => setAiDaypart((event.target.value || null) as typeof aiDaypart)}><option value="">Any time</option><option value="day">Day</option><option value="night">Night</option></select></label>
                 </>
 
@@ -2225,7 +2225,6 @@ function App() {
                   aria-hidden={!advancedFiltersOpen}
                 >
                   <div className="advanced-filter-grid">
-                    <label className="filter-field"><span>Minimum votes</span><input type="number" min="0" value={aiMinVotes} onChange={(event) => setAiMinVotes(event.target.value)} placeholder="Any number of votes" /></label>
                     <label className="filter-field"><span>Minimum rating</span><select value={minRating} onChange={(event) => setMinRating(event.target.value)}><option value="">Any rating</option><option value="2">2.0+</option><option value="3">3.0+</option><option value="3.5">3.5+</option><option value="4">4.0+</option><option value="4.5">4.5+</option></select></label>
                     <label className="filter-field"><span>Maximum rating</span><select value={maxRating} onChange={(event) => setMaxRating(event.target.value)}><option value="">Any rating</option><option value="2">Up to 2.0</option><option value="3">Up to 3.0</option><option value="3.5">Up to 3.5</option><option value="4">Up to 4.0</option><option value="4.5">Up to 4.5</option><option value="5">Up to 5.0</option></select></label>
                     <label className="filter-field"><span>Starting year</span><input type="number" min="1700" max="2027" value={yearFrom} placeholder="1900" onChange={(event) => setYearFrom(event.target.value)} /></label>
@@ -2616,9 +2615,9 @@ function App() {
       >
         <div className="saved-library-header">
           <div>
-            <p className="eyebrow">Your library</p>
+            <p className="eyebrow">Your Library</p>
             <h2 id="saved-library-title">
-              Saved fragrances
+              Saved Fragrances
             </h2>
           </div>
 
@@ -2906,8 +2905,8 @@ function App() {
                       <p className="collection-count">
                         {collection.fragrance_count}{' '}
                         {collection.fragrance_count === 1
-                          ? 'fragrance'
-                          : 'fragrances'}
+                          ? 'Fragrance'
+                          : 'Fragrances'}
                       </p>
                     </button>
                   ))}
@@ -2968,8 +2967,8 @@ function App() {
                     <p className="collection-count">
                       {selectedCollection.fragrances.length}{' '}
                       {selectedCollection.fragrances.length === 1
-                        ? 'fragrance'
-                        : 'fragrances'}
+                        ? 'Fragrance'
+                        : 'Fragrances'}
                     </p>
                     <button
                       type="button"
