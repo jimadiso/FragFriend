@@ -2469,6 +2469,36 @@
   background: rgba(255, 250, 246, 0.17);
 }
 
+.discovery-examples .discovery-examples-refresh {
+  display: grid;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  color: #ffe0c8;
+  background: transparent;
+}
+
+.discovery-examples-refresh svg {
+  width: 22px;
+  height: 22px;
+  transition: transform 280ms ease;
+}
+
+.discovery-examples .discovery-examples-refresh:hover,
+.discovery-examples .discovery-examples-refresh:focus-visible {
+  color: #fff5e9;
+  background: transparent;
+}
+
+.discovery-examples-refresh:hover svg,
+.discovery-examples-refresh:focus-visible svg {
+  transform: rotate(120deg);
+}
+
 .discovery-error,
 .discovery-follow-up,
 .discovery-message {

@@ -102,6 +102,35 @@ const AUTH_TOKEN_STORAGE_KEY = 'fragfriend_access_token'
 const AUTH_USER_STORAGE_KEY = 'fragfriend_user'
 const API_BASE_URL = 'http://127.0.0.1:8000'
 
+const DISCOVERY_PROMPT_SUGGESTIONS = [
+  'Fresh citrus for summer days',
+  'Warm woody scent for autumn',
+  'Sweet fragrance for a night out',
+  'Clean everyday fragrance for the office',
+  'Cozy vanilla scent for winter evenings',
+  'Light floral fragrance for spring',
+  'Smoky leather fragrance for a formal event',
+  'Fresh aquatic scent for a beach vacation',
+  'Soft musky fragrance for a date night',
+  'Green aromatic scent for warm weather',
+  'Spicy amber fragrance with strong reviews',
+  'Fruity fragrance that is easy to wear',
+] as const
+
+function chooseDiscoveryPrompts(previous: readonly string[] = []): string[] {
+  const unused = DISCOVERY_PROMPT_SUGGESTIONS.filter(
+    (suggestion) => !previous.includes(suggestion),
+  )
+  const choices = [...(unused.length >= 3 ? unused : DISCOVERY_PROMPT_SUGGESTIONS)]
+
+  for (let index = choices.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    ;[choices[index], choices[randomIndex]] = [choices[randomIndex], choices[index]]
+  }
+
+  return choices.slice(0, 3)
+}
+
 type DiscoveryPreferenceChip = {
   key: string
   label: string
@@ -222,6 +251,9 @@ function App() {
   const [searchMode, setSearchMode] = useState<SearchMode>('brand')
   const [query, setQuery] = useState('')
   const [discoveryPrompt, setDiscoveryPrompt] = useState('')
+  const [discoveryExamples, setDiscoveryExamples] = useState(() =>
+    chooseDiscoveryPrompts(),
+  )
   const [discoveryOriginalPrompt, setDiscoveryOriginalPrompt] = useState('')
   const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResponse | null>(null)
   const [discoveryLoading, setDiscoveryLoading] = useState(false)
@@ -2301,11 +2333,27 @@ function App() {
 
           {!discoveryResult && !discoveryLoading && (
             <div className="discovery-examples" aria-label="Discovery examples">
-              {['Fresh citrus for summer days', 'Warm woody scent for autumn', 'Sweet fragrance for a night out'].map((example) => (
+              {discoveryExamples.map((example) => (
                 <button key={example} type="button" onClick={() => startDiscoveryExample(example)}>
                   {example}
                 </button>
               ))}
+              <button
+                type="button"
+                className="discovery-examples-refresh"
+                aria-label="Refresh suggested prompts"
+                title="Show different suggestions"
+                onClick={() =>
+                  setDiscoveryExamples((current) =>
+                    chooseDiscoveryPrompts(current),
+                  )
+                }
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+                  <path d="M20 4v7h-7" />
+                </svg>
+              </button>
             </div>
           )}
 
