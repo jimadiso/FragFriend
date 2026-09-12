@@ -248,6 +248,7 @@ function App() {
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const filterPanelRef = useRef<HTMLElement>(null)
   const [minRating, setMinRating] = useState('')
@@ -2206,16 +2207,32 @@ function App() {
                   </div>
                 </div>
               </div>
-              <details className="advanced-filters">
-                <summary>Advanced filters</summary>
-                <div className="advanced-filter-grid">
-                  <label className="filter-field"><span>Minimum votes</span><input type="number" min="0" value={aiMinVotes} onChange={(event) => setAiMinVotes(event.target.value)} placeholder="Any number of votes" /></label>
-                  <label className="filter-field"><span>Minimum rating</span><select value={minRating} onChange={(event) => setMinRating(event.target.value)}><option value="">Any rating</option><option value="2">2.0+</option><option value="3">3.0+</option><option value="3.5">3.5+</option><option value="4">4.0+</option><option value="4.5">4.5+</option></select></label>
-                  <label className="filter-field"><span>Maximum rating</span><select value={maxRating} onChange={(event) => setMaxRating(event.target.value)}><option value="">Any rating</option><option value="2">Up to 2.0</option><option value="3">Up to 3.0</option><option value="3.5">Up to 3.5</option><option value="4">Up to 4.0</option><option value="4.5">Up to 4.5</option><option value="5">Up to 5.0</option></select></label>
-                  <label className="filter-field"><span>Starting year</span><input type="number" min="1700" max="2027" value={yearFrom} placeholder="1900" onChange={(event) => setYearFrom(event.target.value)} /></label>
-                  <label className="filter-field"><span>Ending year</span><input type="number" min="1700" max="2027" value={yearTo} placeholder="2027" onChange={(event) => setYearTo(event.target.value)} /></label>
+              <div className={`advanced-filters ${advancedFiltersOpen ? 'is-open' : ''}`}>
+                <button
+                  type="button"
+                  className="advanced-filters-toggle"
+                  aria-expanded={advancedFiltersOpen}
+                  aria-controls="advanced-filter-content"
+                  onClick={() => setAdvancedFiltersOpen((open) => !open)}
+                >
+                  <span className="advanced-filters-chevron" aria-hidden="true">▶</span>
+                  Advanced filters
+                </button>
+
+                <div
+                  id="advanced-filter-content"
+                  className="advanced-filter-content"
+                  aria-hidden={!advancedFiltersOpen}
+                >
+                  <div className="advanced-filter-grid">
+                    <label className="filter-field"><span>Minimum votes</span><input type="number" min="0" value={aiMinVotes} onChange={(event) => setAiMinVotes(event.target.value)} placeholder="Any number of votes" /></label>
+                    <label className="filter-field"><span>Minimum rating</span><select value={minRating} onChange={(event) => setMinRating(event.target.value)}><option value="">Any rating</option><option value="2">2.0+</option><option value="3">3.0+</option><option value="3.5">3.5+</option><option value="4">4.0+</option><option value="4.5">4.5+</option></select></label>
+                    <label className="filter-field"><span>Maximum rating</span><select value={maxRating} onChange={(event) => setMaxRating(event.target.value)}><option value="">Any rating</option><option value="2">Up to 2.0</option><option value="3">Up to 3.0</option><option value="3.5">Up to 3.5</option><option value="4">Up to 4.0</option><option value="4.5">Up to 4.5</option><option value="5">Up to 5.0</option></select></label>
+                    <label className="filter-field"><span>Starting year</span><input type="number" min="1700" max="2027" value={yearFrom} placeholder="1900" onChange={(event) => setYearFrom(event.target.value)} /></label>
+                    <label className="filter-field"><span>Ending year</span><input type="number" min="1700" max="2027" value={yearTo} placeholder="2027" onChange={(event) => setYearTo(event.target.value)} /></label>
+                  </div>
                 </div>
-              </details>
+              </div>
               <div className="filter-footer">
                 <button
                   type="submit"
@@ -2240,7 +2257,9 @@ function App() {
             onClick={() => setDiscoveryOpen((isOpen) => !isOpen)}
           >
             <div>
-              <p className="discovery-kicker">AI fragrance discovery</p>
+              <p className="discovery-kicker" data-text="AI fragrance discovery">
+                AI fragrance discovery
+              </p>
               <h2 id="discovery-heading">What are you in the mood for?</h2>
             </div>
             <span className="discovery-chevron" aria-hidden="true">

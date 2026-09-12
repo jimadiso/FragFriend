@@ -733,8 +733,8 @@
 
 .filter-panel {
   position: absolute;
-  top: 44px;
-  transform: translateY(calc(-60% + 100px)) translateX(calc(50% + 10px));
+  top: -100px;
+  transform: translateX(calc(50% + 150px));
   right: 0;
   z-index: 20;
   width: min(620px, 90vw);
@@ -863,14 +863,51 @@
   gap: 18px;
 }
 
-.advanced-filters summary {
+.advanced-filters-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 0;
+  border: 0;
   color: #5f5148;
+  background: transparent;
   font-size: 0.86rem;
   font-weight: 800;
   cursor: pointer;
 }
 
-.advanced-filter-grid {
+.advanced-filters-chevron {
+  display: inline-block;
+  font-size: 0.7rem;
+  transform: rotate(0deg);
+  transition: transform 340ms ease;
+}
+
+.advanced-filters.is-open .advanced-filters-chevron {
+  transform: rotate(90deg);
+}
+
+.advanced-filter-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-14px);
+  transition:
+    max-height 340ms ease,
+    opacity 180ms ease,
+    transform 340ms ease;
+}
+
+.advanced-filters.is-open .advanced-filter-content {
+  max-height: 430px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.advanced-filter-content .advanced-filter-grid {
   margin-top: 16px;
 }
 
@@ -2223,7 +2260,7 @@
 .discovery-kicker,
 .manual-search-label {
   margin: 0;
-  font-size: .9rem;
+  font-size: .95rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2231,27 +2268,31 @@
 
 .discovery-kicker {
   color: transparent;
-  background: linear-gradient(
+  background-image: linear-gradient(
     105deg,
     #b97858 0%,
-    #d69b78 32%,
+    #b97858 18%,
+    #d69b78 34%,
     #fff5e9 48%,
-    #d69b78 63%,
+    #d69b78 62%,
+    #b97858 78%,
     #b97858 100%
   );
-  background-size: 240% 100%;
+  background-size: 360px 100%;
+  background-repeat: repeat-x;
   -webkit-background-clip: text;
   background-clip: text;
   animation: discovery-kicker-shine 3.6s linear infinite;
+  will-change: background-position;
 }
 
 @keyframes discovery-kicker-shine {
   from {
-    background-position: 200% 0;
+    background-position: 0 0;
   }
 
   to {
-    background-position: -40% 0;
+    background-position: 360px 0;
   }
 }
 
