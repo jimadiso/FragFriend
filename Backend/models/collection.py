@@ -29,6 +29,11 @@ class CollectionCreate(BaseModel):
     description: CollectionDescription | None = None
 
 
+class CollectionUpdate(BaseModel):
+    name: CollectionName
+    description: CollectionDescription | None = None
+
+
 class CollectionSummary(BaseModel):
     id: int
     name: str

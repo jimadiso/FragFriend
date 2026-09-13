@@ -78,6 +78,46 @@ def create_collection(
     collection["fragrance_count"] = 0
     return collection
 
+
+def update_collection(
+    user_id: int,
+    collection_id: int,
+    name: str,
+    description: str | None,
+) -> dict | None:
+    sql = """
+        UPDATE fragrance_collections
+        SET name = :name,
+            description = :description
+        WHERE id = :collection_id
+          AND user_id = :user_id
+        RETURNING
+            id,
+            name,
+            description,
+            created_at,
+            (
+                SELECT CAST(COUNT(*) AS INTEGER)
+                FROM collection_fragrances
+                WHERE collection_id = :collection_id
+            ) AS fragrance_count
+    """
+
+    with engine.begin() as connection:
+        result = connection.execute(
+            text(sql),
+            {
+                "user_id": user_id,
+                "collection_id": collection_id,
+                "name": name,
+                "description": description,
+            },
+        )
+        row = result.mappings().one_or_none()
+
+    return dict(row) if row is not None else None
+
+
 def collection_belongs_to_user(
     user_id: int,
     collection_id: int,

@@ -30,6 +30,7 @@ import {
   getCollection,
   getCollections,
   removeFragranceFromCollection,
+  updateCollection,
   type FragranceCollection,
   type FragranceCollectionDetail,
 } from './services/collectionApi'
@@ -244,6 +245,11 @@ function App() {
   const [collectionPickerOpen, setCollectionPickerOpen] = useState(false)
   const [collectionDeleting, setCollectionDeleting] = useState(false)
   const [collectionDeleteConfirmOpen, setCollectionDeleteConfirmOpen] = useState(false)
+  const [collectionEditing, setCollectionEditing] = useState(false)
+  const [collectionEditName, setCollectionEditName] = useState('')
+  const [collectionEditDescription, setCollectionEditDescription] = useState('')
+  const [collectionEditSaving, setCollectionEditSaving] = useState(false)
+  const [collectionEditError, setCollectionEditError] = useState('')
   const [collectionActionLoadingId, setCollectionActionLoadingId] = useState<number | null>(null)
   const [collectionActionError, setCollectionActionError] = useState('')
   const [collectionActionMessage, setCollectionActionMessage] = useState('')
@@ -1578,6 +1584,10 @@ function App() {
     try {
       const collection = await getCollection(collectionId)
       setSelectedCollection(collection)
+      setCollectionEditName(collection.name)
+      setCollectionEditDescription(collection.description || '')
+      setCollectionEditing(false)
+      setCollectionEditError('')
     } catch (requestError) {
       setSelectedCollectionError(
         requestError instanceof Error
@@ -1593,6 +1603,56 @@ function App() {
     setSelectedCollection(null)
     setSelectedCollectionError('')
     setCollectionDeleteConfirmOpen(false)
+    setCollectionEditing(false)
+    setCollectionEditError('')
+  }
+
+  async function saveSelectedCollection(
+    event: SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault()
+    if (!selectedCollection || collectionEditSaving) return
+
+    const name = collectionEditName.trim()
+    if (!name) {
+      setCollectionEditError('Enter a name for your collection.')
+      return
+    }
+
+    setCollectionEditSaving(true)
+    setCollectionEditError('')
+
+    try {
+      const updated = await updateCollection(
+        selectedCollection.id,
+        {
+          name,
+          description:
+            collectionEditDescription.trim() || null,
+        },
+      )
+      setSelectedCollection((current) =>
+        current ? { ...current, ...updated } : current,
+      )
+      setCollections((current) =>
+        current.map((collection) =>
+          collection.id === updated.id
+            ? { ...collection, ...updated }
+            : collection,
+        ),
+      )
+      setCollectionEditName(updated.name)
+      setCollectionEditDescription(updated.description || '')
+      setCollectionEditing(false)
+    } catch (requestError) {
+      setCollectionEditError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'We could not update this collection.',
+      )
+    } finally {
+      setCollectionEditSaving(false)
+    }
   }
 
   async function removeSelectedCollectionFragrance(
@@ -3000,12 +3060,77 @@ function App() {
                 <>
                   <header className="collection-detail-header">
                     <p className="eyebrow">Collection</p>
-                    <h2 id="collection-detail-title">
-                      {selectedCollection.name}
-                    </h2>
-
-                    {selectedCollection.description && (
-                      <p>{selectedCollection.description}</p>
+                    {collectionEditing ? (
+                      <form
+                        className="collection-edit-form"
+                        onSubmit={saveSelectedCollection}
+                      >
+                        <label htmlFor="collection-edit-name">
+                          Collection name
+                        </label>
+                        <input
+                          id="collection-edit-name"
+                          type="text"
+                          value={collectionEditName}
+                          maxLength={80}
+                          autoFocus
+                          onChange={(event) =>
+                            setCollectionEditName(event.target.value)
+                          }
+                        />
+                        <label htmlFor="collection-edit-description">
+                          Description
+                        </label>
+                        <textarea
+                          id="collection-edit-description"
+                          value={collectionEditDescription}
+                          maxLength={240}
+                          placeholder="Add a collection description"
+                          onChange={(event) =>
+                            setCollectionEditDescription(event.target.value)
+                          }
+                        />
+                        {collectionEditError && (
+                          <p className="collection-form-error" role="alert">
+                            {collectionEditError}
+                          </p>
+                        )}
+                        <div className="collection-edit-actions">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCollectionEditName(selectedCollection.name)
+                              setCollectionEditDescription(selectedCollection.description || '')
+                              setCollectionEditError('')
+                              setCollectionEditing(false)
+                            }}
+                            disabled={collectionEditSaving}
+                          >
+                            Cancel
+                          </button>
+                          <button type="submit" disabled={collectionEditSaving}>
+                            {collectionEditSaving ? 'Saving…' : 'Save changes'}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <div className="collection-title-row">
+                          <h2 id="collection-detail-title">
+                            {selectedCollection.name}
+                          </h2>
+                          <button
+                            type="button"
+                            className="collection-edit-button"
+                            onClick={() => setCollectionEditing(true)}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                        <p className={selectedCollection.description ? '' : 'collection-empty-description'}>
+                          {selectedCollection.description || 'Add a collection description'}
+                        </p>
+                      </>
                     )}
 
                     <p className="collection-count">

@@ -27,6 +27,8 @@ export type CreateCollectionInput = {
   description: string | null
 }
 
+export type UpdateCollectionInput = CreateCollectionInput
+
 function getAuthorizationHeaders() {
   const token = sessionStorage.getItem(
     AUTH_TOKEN_STORAGE_KEY,
@@ -126,6 +128,34 @@ export async function getCollection(
       await readErrorMessage(
         response,
         'We could not load this collection.',
+      ),
+    )
+  }
+
+  return response.json()
+}
+
+export async function updateCollection(
+  collectionId: number,
+  collection: UpdateCollectionInput,
+): Promise<FragranceCollection> {
+  const response = await fetch(
+    `${API_BASE_URL}/collections/${collectionId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...getAuthorizationHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(collection),
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(
+        response,
+        'We could not update this collection.',
       ),
     )
   }

@@ -2469,6 +2469,101 @@
   background: rgba(255, 250, 246, 0.17);
 }
 
+.collection-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.collection-edit-button {
+  padding: 7px 12px;
+  border: 1px solid rgb(91 70 56 / 22%);
+  border-radius: 999px;
+  color: #704b35;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collection-edit-button:hover {
+  border-color: #986c50;
+  background: #f5eee8;
+}
+
+.collection-empty-description {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.collection-edit-form {
+  display: grid;
+  max-width: 680px;
+  gap: 8px;
+}
+
+.collection-edit-form label {
+  margin-top: 8px;
+  color: #49382e;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.collection-edit-form input,
+.collection-edit-form textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgb(91 70 56 / 22%);
+  border-radius: 12px;
+  color: #2d2520;
+  background: #fffdfb;
+  font: inherit;
+}
+
+.collection-edit-form input {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.5rem;
+}
+
+.collection-edit-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.collection-edit-form input:focus,
+.collection-edit-form textarea:focus {
+  border-color: #986c50;
+  outline: 3px solid rgb(152 108 80 / 18%);
+}
+
+.collection-edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.collection-edit-actions button {
+  padding: 9px 14px;
+  border: 1px solid rgb(91 70 56 / 22%);
+  border-radius: 999px;
+  color: #49382e;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collection-edit-actions button[type='submit'] {
+  border-color: #49382e;
+  color: #fffaf6;
+  background: #49382e;
+}
+
+.collection-edit-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .discovery-examples .discovery-examples-refresh {
   display: grid;
   width: 36px;

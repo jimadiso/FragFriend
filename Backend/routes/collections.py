@@ -1,10 +1,12 @@
 from fastapi import ( APIRouter, Depends, HTTPException, Response, status, )
+from sqlalchemy.exc import IntegrityError
 
 from Backend.models.collection import (
     CollectionCreate,
     CollectionDetail,
     CollectionMembership,
     CollectionSummary,
+    CollectionUpdate,
 )
 from Backend.routes.auth import get_current_user
 from Backend.services import collection_service
@@ -63,6 +65,37 @@ def read_collection(
         user_id=current_user["id"],
         collection_id=collection_id,
     )
+
+    if collection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+
+    return collection
+
+
+@router.patch(
+    "/{collection_id}",
+    response_model=CollectionSummary,
+)
+def update_collection(
+    collection_id: int,
+    collection_data: CollectionUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        collection = collection_service.update_collection(
+            user_id=current_user["id"],
+            collection_id=collection_id,
+            name=collection_data.name,
+            description=collection_data.description,
+        )
+    except IntegrityError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A collection with this name already exists",
+        ) from error
 
     if collection is None:
         raise HTTPException(
