@@ -1747,6 +1747,7 @@ function App() {
     setCollectionsError('')
     setCollectionFormOpen(false)
     setAppView('search')
+    window.location.reload()
   }
 
   function navigatePage(page: BladePage) {

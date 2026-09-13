@@ -332,7 +332,7 @@ def search_fragrances(
                 mainaccord3 ILIKE :{parameter_name} OR
                 mainaccord4 ILIKE :{parameter_name} OR
                 mainaccord5 ILIKE :{parameter_name} OR
-                (to_jsonb(fragrances)->>'accords_all') ILIKE :{parameter_name}
+                (to_jsonb(f)->>'accords_all') ILIKE :{parameter_name}
             )
         """
 
@@ -351,7 +351,7 @@ def search_fragrances(
                 top_notes ILIKE :{parameter_name} OR
                 middle_notes ILIKE :{parameter_name} OR
                 base_notes ILIKE :{parameter_name} OR
-                (to_jsonb(fragrances)->>'flat_notes') ILIKE :{parameter_name}
+                (to_jsonb(f)->>'flat_notes') ILIKE :{parameter_name}
             )
         """
 
@@ -460,7 +460,7 @@ def count_fragrances(
                 mainaccord3 ILIKE :{parameter_name} OR
                 mainaccord4 ILIKE :{parameter_name} OR
                 mainaccord5 ILIKE :{parameter_name} OR
-                (to_jsonb(fragrances)->>'accords_all') ILIKE :{parameter_name}
+                (to_jsonb(f)->>'accords_all') ILIKE :{parameter_name}
             )
         """
 
@@ -479,7 +479,7 @@ def count_fragrances(
                 top_notes ILIKE :{parameter_name} OR
                 middle_notes ILIKE :{parameter_name} OR
                 base_notes ILIKE :{parameter_name} OR
-                (to_jsonb(fragrances)->>'flat_notes') ILIKE :{parameter_name}
+                (to_jsonb(f)->>'flat_notes') ILIKE :{parameter_name}
             )
         """
 
