@@ -127,6 +127,22 @@ def test_missing_fragrance_cannot_be_bookmarked(monkeypatch):
     }
 
 
+def test_saved_fragrance_limit_returns_409(monkeypatch):
+    def limit_reached(**kwargs):
+        raise bookmark_service.SavedFragranceLimitReached
+
+    monkeypatch.setattr(
+        bookmark_service,
+        "add_bookmark",
+        limit_reached,
+    )
+
+    response = client.post("/bookmarks/3785")
+
+    assert response.status_code == 409
+    assert "100 maximum" in response.json()["detail"]
+
+
 def test_remove_bookmark(monkeypatch):
     received_parameters = {}
 

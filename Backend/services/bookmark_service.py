@@ -1,6 +1,11 @@
 from sqlalchemy import text
 
 from Backend.database import engine
+from Backend.limits import SAVED_FRAGRANCE_LIMIT
+
+
+class SavedFragranceLimitReached(Exception):
+    pass
 
 
 def fragrance_exists(fragrance_id: int) -> bool:
@@ -28,7 +33,20 @@ def add_bookmark(
     if not fragrance_exists(fragrance_id):
         return False
 
-    sql = """
+    existing_sql = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM bookmarks
+            WHERE user_id = :user_id
+              AND fragrance_id = :fragrance_id
+        )
+    """
+    count_sql = """
+        SELECT COUNT(*)
+        FROM bookmarks
+        WHERE user_id = :user_id
+    """
+    insert_sql = """
         INSERT INTO bookmarks (
             user_id,
             fragrance_id
@@ -43,11 +61,26 @@ def add_bookmark(
 
     with engine.begin() as connection:
         connection.execute(
-            text(sql),
-            {
-                "user_id": user_id,
-                "fragrance_id": fragrance_id,
-            },
+            text("SELECT pg_advisory_xact_lock(:user_id)"),
+            {"user_id": user_id},
+        )
+        parameters = {
+            "user_id": user_id,
+            "fragrance_id": fragrance_id,
+        }
+        if connection.execute(
+            text(existing_sql),
+            parameters,
+        ).scalar_one():
+            return True
+        if connection.execute(
+            text(count_sql),
+            {"user_id": user_id},
+        ).scalar_one() >= SAVED_FRAGRANCE_LIMIT:
+            raise SavedFragranceLimitReached
+        connection.execute(
+            text(insert_sql),
+            parameters,
         )
 
     return True

@@ -249,7 +249,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 0;
   padding: 24px 28px;
   border: 1px solid rgb(91 70 56 / 14%);
   border-radius: 22px;
@@ -268,6 +268,22 @@
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(1.8rem, 4vw, 2.6rem);
   font-weight: 500;
+}
+
+.library-limit-row {
+  display: flex;
+  align-items: center;
+  margin: 16px 0 28px;
+  padding: 0 4px 14px;
+  border-bottom: 1px solid rgb(152 108 80 / 32%);
+}
+
+.library-limit-count {
+  margin: 0;
+  color: #986c50;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.15rem, 2vw, 1.4rem);
+  font-weight: 700;
 }
 
 .saved-tabs {
@@ -346,8 +362,19 @@
   cursor: pointer;
 }
 
-.collection-actions button:hover {
+.collection-actions button:hover:not(:disabled) {
   background: #654c3e;
+}
+
+.collection-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.collection-limit-message {
+  margin: -10px 0 20px;
+  color: #806f63;
+  text-align: right;
 }
 
 .collection-form {

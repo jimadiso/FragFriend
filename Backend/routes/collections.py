@@ -39,11 +39,17 @@ def create_collection(
     collection_data: CollectionCreate,
     current_user: dict = Depends(get_current_user),
 ):
-    collection = collection_service.create_collection(
-        user_id=current_user["id"],
-        name=collection_data.name,
-        description=collection_data.description,
-    )
+    try:
+        collection = collection_service.create_collection(
+            user_id=current_user["id"],
+            name=collection_data.name,
+            description=collection_data.description,
+        )
+    except collection_service.CollectionLimitReached as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have reached the limit of 10 collections. Delete a collection before creating another.",
+        ) from error
 
     if collection is None:
         raise HTTPException(
@@ -116,13 +122,19 @@ def add_fragrance_to_collection(
     fragrance_id: int,
     current_user: dict = Depends(get_current_user),
 ):
-    membership = (
-        collection_service.add_fragrance_to_collection(
-            user_id=current_user["id"],
-            collection_id=collection_id,
-            fragrance_id=fragrance_id,
+    try:
+        membership = (
+            collection_service.add_fragrance_to_collection(
+                user_id=current_user["id"],
+                collection_id=collection_id,
+                fragrance_id=fragrance_id,
+            )
         )
-    )
+    except collection_service.SavedFragranceLimitReached as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your Library is full. Remove a saved fragrance before adding another (100 maximum).",
+        ) from error
 
     if membership is None:
         raise HTTPException(

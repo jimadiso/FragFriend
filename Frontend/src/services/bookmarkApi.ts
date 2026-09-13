@@ -40,6 +40,15 @@ async function parseBookmarkResponse(
   }
 
   if (!response.ok) {
+    const responseBody = await response.json().catch(() => null)
+    if (
+      typeof responseBody === 'object' &&
+      responseBody !== null &&
+      'detail' in responseBody &&
+      typeof responseBody.detail === 'string'
+    ) {
+      throw new Error(responseBody.detail)
+    }
     throw new Error('We could not update this bookmark.')
   }
 

@@ -42,6 +42,10 @@ import {
 } from './services/discoveryApi'
 
 import './App.css'
+import {
+  COLLECTION_LIMIT,
+  SAVED_FRAGRANCE_LIMIT,
+} from './constants/libraryLimits'
 
 type SearchMode = 'brand' | 'name'
 type SavedTab = 'all' | 'collections'
@@ -1756,6 +1760,13 @@ function App() {
   ) {
     event.preventDefault()
 
+    if (collections.length >= COLLECTION_LIMIT) {
+      setCollectionFormError(
+        `You have reached the limit of ${COLLECTION_LIMIT} collections. Delete one before creating another.`,
+      )
+      return
+    }
+
     const trimmedName = collectionName.trim()
     const trimmedDescription =
       collectionDescription.trim()
@@ -2757,6 +2768,14 @@ function App() {
           </div>
         </div>
 
+        <div className="library-limit-row" aria-live="polite">
+          <p className="library-limit-count">
+            {savedTab === 'all'
+              ? `${savedFragrances.length} / ${SAVED_FRAGRANCE_LIMIT} Saved`
+              : `${collections.length} / ${COLLECTION_LIMIT} Collections`}
+          </p>
+        </div>
+
         {savedTab === 'all' && (
           <>
             {savedLoading && (
@@ -2862,14 +2881,23 @@ function App() {
             <div className="collection-actions">
               <button
                 type="button"
+                disabled={collections.length >= COLLECTION_LIMIT}
                 onClick={() => {
                   setCollectionFormError('')
                   setCollectionFormOpen(true)
                 }}
               >
-                + New collection
+                {collections.length >= COLLECTION_LIMIT
+                  ? 'Collection limit reached'
+                  : '+ New collection'}
               </button>
             </div>
+
+            {collections.length >= COLLECTION_LIMIT && (
+              <p className="collection-limit-message" role="status">
+                Delete a collection before creating another.
+              </p>
+            )}
 
             {collectionFormOpen && (
               <form

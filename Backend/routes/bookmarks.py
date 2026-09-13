@@ -54,10 +54,16 @@ def create_bookmark(
     fragrance_id: int,
     current_user: dict = Depends(get_current_user),
 ):
-    fragrance_found = bookmark_service.add_bookmark(
-        user_id=current_user["id"],
-        fragrance_id=fragrance_id,
-    )
+    try:
+        fragrance_found = bookmark_service.add_bookmark(
+            user_id=current_user["id"],
+            fragrance_id=fragrance_id,
+        )
+    except bookmark_service.SavedFragranceLimitReached as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your Library is full. Remove a saved fragrance before adding another (100 maximum).",
+        ) from error
 
     if not fragrance_found:
         raise HTTPException(

@@ -1,0 +1,3 @@
+export const SAVED_FRAGRANCE_LIMIT = 100
+export const COLLECTION_LIMIT = 10
+

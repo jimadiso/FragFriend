@@ -23,6 +23,13 @@ UPDATED_COLLECTION = {
     "fragrance_count": 3,
     "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
 }
+NEW_COLLECTION = {
+    **UPDATED_COLLECTION,
+    "id": 13,
+    "name": "New Collection",
+    "description": None,
+    "fragrance_count": 0,
+}
 
 
 @pytest.fixture(autouse=True)
@@ -62,6 +69,41 @@ def test_update_collection(monkeypatch):
         "name": "Autumn Evenings",
         "description": "Warm scents for cool nights.",
     }
+
+
+def test_collection_limit_returns_409(monkeypatch):
+    def limit_reached(**kwargs):
+        raise collection_service.CollectionLimitReached
+
+    monkeypatch.setattr(
+        collection_service,
+        "create_collection",
+        limit_reached,
+    )
+
+    response = client.post(
+        "/collections/",
+        json={"name": "Eleventh", "description": None},
+    )
+
+    assert response.status_code == 409
+    assert "limit of 10 collections" in response.json()["detail"]
+
+
+def test_collection_add_honors_saved_fragrance_limit(monkeypatch):
+    def limit_reached(**kwargs):
+        raise collection_service.SavedFragranceLimitReached
+
+    monkeypatch.setattr(
+        collection_service,
+        "add_fragrance_to_collection",
+        limit_reached,
+    )
+
+    response = client.post("/collections/12/fragrances/3785")
+
+    assert response.status_code == 409
+    assert "100 maximum" in response.json()["detail"]
 
 
 def test_collection_update_cors_preflight_allows_patch():

@@ -1,6 +1,15 @@
 from sqlalchemy import text
 
 from Backend.database import engine
+from Backend.limits import COLLECTION_LIMIT, SAVED_FRAGRANCE_LIMIT
+
+
+class CollectionLimitReached(Exception):
+    pass
+
+
+class SavedFragranceLimitReached(Exception):
+    pass
 
 
 def get_collections(user_id: int) -> list[dict]:
@@ -104,6 +113,22 @@ def update_collection(
     """
 
     with engine.begin() as connection:
+        connection.execute(
+            text("SELECT pg_advisory_xact_lock(:user_id)"),
+            {"user_id": user_id},
+        )
+        collection_count = connection.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM fragrance_collections
+                WHERE user_id = :user_id
+                """
+            ),
+            {"user_id": user_id},
+        ).scalar_one()
+        if collection_count >= COLLECTION_LIMIT:
+            raise CollectionLimitReached
         result = connection.execute(
             text(sql),
             {
@@ -281,14 +306,44 @@ def add_fragrance_to_collection(
         ON CONFLICT (collection_id, fragrance_id)
         DO NOTHING
     """
+    bookmarked_sql = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM bookmarks
+            WHERE user_id = :user_id
+              AND fragrance_id = :fragrance_id
+        )
+    """
+    bookmark_count_sql = """
+        SELECT COUNT(*)
+        FROM bookmarks
+        WHERE user_id = :user_id
+    """
 
     with engine.begin() as connection:
         connection.execute(
+            text("SELECT pg_advisory_xact_lock(:user_id)"),
+            {"user_id": user_id},
+        )
+        parameters = {
+            "user_id": user_id,
+            "fragrance_id": fragrance_id,
+        }
+        is_already_saved = connection.execute(
+            text(bookmarked_sql),
+            parameters,
+        ).scalar_one()
+        if (
+            not is_already_saved
+            and connection.execute(
+                text(bookmark_count_sql),
+                {"user_id": user_id},
+            ).scalar_one() >= SAVED_FRAGRANCE_LIMIT
+        ):
+            raise SavedFragranceLimitReached
+        connection.execute(
             text(bookmark_sql),
-            {
-                "user_id": user_id,
-                "fragrance_id": fragrance_id,
-            },
+            parameters,
         )
         connection.execute(
             text(collection_sql),
