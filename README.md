@@ -1,6 +1,6 @@
 # FragFriend
 
-FragFriend is a full-stack fragrance discovery application backed by a searchable PostgreSQL dataset of more than 24,000 fragrances. It combines Python data pipelines, a FastAPI REST API, and a React/TypeScript interface so users can explore fragrances, filter by notes and accords, create accounts, bookmark fragrances, and organize favorites into collections.
+FragFriend is a full-stack fragrance discovery application backed by a searchable PostgreSQL dataset of more than 131,000 fragrances. It combines Python data pipelines, a FastAPI REST API, and a React/TypeScript interface so users can explore fragrances, filter by notes and accords, create accounts, bookmark fragrances, and organize favorites into collections.
 
 ## Application preview
 
