@@ -19,6 +19,12 @@ export type DiscoveryResponse = {
     gender: 'Women' | 'Men' | 'Unisex' | null
     notes: string[]
     accords: string[]
+    required_terms: string[]
+    or_groups: string[][]
+    preferred_accords: string[]
+    exclude_notes: string[]
+    exclude_accords: string[]
+    context: 'office' | 'beach' | 'date_night' | 'gym' | 'formal_event' | 'everyday' | 'other' | null
     season: 'winter' | 'spring' | 'summer' | 'autumn' | null
     time_of_day: 'day' | 'night' | null
     occasion: string | null

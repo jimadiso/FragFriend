@@ -62,6 +62,12 @@ class DiscoveryPreferences(BaseModel):
     gender: Literal["Women", "Men", "Unisex"] | None = None
     notes: list[str] = Field(default_factory=list, max_length=5)
     accords: list[str] = Field(default_factory=list, max_length=5)
+    required_terms: list[str] = Field(default_factory=list, max_length=5)
+    or_groups: list[list[str]] = Field(default_factory=list, max_length=3)
+    preferred_accords: list[str] = Field(default_factory=list, max_length=5)
+    exclude_notes: list[str] = Field(default_factory=list, max_length=5)
+    exclude_accords: list[str] = Field(default_factory=list, max_length=5)
+    context: Literal["office", "beach", "date_night", "gym", "formal_event", "everyday", "other"] | None = None
     season: Literal["winter", "spring", "summer", "autumn"] | None = None
     time_of_day: Literal["day", "night"] | None = None
     occasion: str | None = Field(default=None, max_length=80)

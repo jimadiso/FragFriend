@@ -5,6 +5,7 @@ from Backend.routes.fragrances import router as fragrance_router
 from Backend.routes.auth import router as auth_router
 from Backend.routes.bookmarks import router as bookmark_router
 from Backend.routes.collections import router as collection_router
+from Backend.routes.ratings import router as rating_router
 
 
 app = FastAPI()
@@ -32,3 +33,4 @@ app.include_router(fragrance_router)
 app.include_router(auth_router)
 app.include_router(bookmark_router)
 app.include_router(collection_router)
+app.include_router(rating_router)

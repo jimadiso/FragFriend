@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from Backend.database import engine
+from Backend.services.rating_sort import bayesian_rating_sql
 
 
 def _build_brand_filters(
@@ -394,8 +395,14 @@ def search_fragrances(
         if column:
             if order.lower() not in ('asc','desc'):
                 order = 'asc'
-            
-            query += f" ORDER BY {column} {order.upper()} NULLS LAST"
+            if sort_by.lower() == 'rating' and order.lower() == 'desc':
+                query += (
+                    f" ORDER BY {bayesian_rating_sql()} DESC NULLS LAST, "
+                    "f.rating_count DESC NULLS LAST, f.rating_value DESC NULLS LAST, "
+                    "f.perfume ASC, f.id ASC"
+                )
+            else:
+                query += f" ORDER BY {column} {order.upper()} NULLS LAST"
     
 
     query += " LIMIT :limit OFFSET :offset"

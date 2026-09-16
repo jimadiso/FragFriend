@@ -1,0 +1,27 @@
+.fragrance-rating { margin: 18px 0; padding: 16px; border: 1px solid #decfc3; border-radius: 14px; background: #f7f0e9; color: #5b4638; }
+.rating-source { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-weight: 600; }
+.rating-source select { padding: 8px; border: 1px solid #decfc3; border-radius: 8px; background: #fffaf6; color: #49382e; font: inherit; max-width: 100%; }
+.fragrance-rating p { margin: 10px 0; }
+.rating-instruction, .fragrance-rating small { font-size: .85rem; }
+.rating-stars { display: flex; width: max-content; }
+.rating-star { position: relative; display: block; width: 40px; height: 44px; font: 40px/44px Georgia, serif; }
+.rating-star-empty { color: #d9c8b9; }
+.rating-star-fill { position: absolute; inset: 0 auto 0 0; overflow: hidden; color: #a36d48; pointer-events: none; }
+.rating-star input { appearance: none; position: absolute; top: 0; width: 50%; height: 100%; margin: 0; border: 0; background: transparent; cursor: pointer; }
+.rating-star .star-left { left: 0; }
+.rating-star .star-right { right: 0; }
+.rating-star input:focus-visible { outline: 2px solid #704b35; border-radius: 4px; }
+.rating-submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 10px 0; }
+.fragrance-rating button { padding: 8px 14px; border: 1px solid #49382e; border-radius: 999px; color: #fffaf6; background: #49382e; font: inherit; cursor: pointer; }
+.fragrance-rating button:disabled, .rating-star input:disabled { opacity: .6; cursor: default; }
+.fragrance-rating .rating-error { color: #a83a2d; }
+
+.rating-compact { display: flex; align-items: center; gap: 12px; margin: 8px 0 18px; }
+.rating-stars-preview .rating-star { width: 24px; height: 28px; font-size: 24px; line-height: 28px; }
+.rating-compact .rating-link { padding: 0; border: 0; background: transparent; color: #986c50; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.rating-link:focus-visible { outline: 2px solid #986c50; outline-offset: 4px; }
+.rating-popup-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgb(45 37 32 / 45%); backdrop-filter: blur(3px); }
+.fragrance-rating.rating-popup { position: relative; width: min(440px, 100%); box-sizing: border-box; max-height: calc(100dvh - 40px); overflow-y: auto; margin: 0; padding: 28px; border-radius: 20px; background: #fffaf6; box-shadow: 0 24px 70px rgb(45 37 32 / 28%); text-align: left; }
+.rating-popup h3 { margin: 0 40px 16px 0; color: #2d2520; font: 500 1.7rem Georgia, serif; }
+.rating-popup p { line-height: 1.5; }
+.rating-popup .rating-popup-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; padding: 0; color: #5b4638; background: transparent; border-color: #decfc3; font-size: 1.3rem; }

@@ -42,6 +42,7 @@ import {
 } from './services/discoveryApi'
 
 import './App.css'
+import FragranceRating from './components/FragranceRating'
 import {
   COLLECTION_LIMIT,
   SAVED_FRAGRANCE_LIMIT,
@@ -152,11 +153,17 @@ function getDiscoveryPreferenceChips(
   preferences: DiscoveryResponse['preferences'],
 ) {
   const chips: DiscoveryPreferenceChip[] = []
+  preferences.exclude_notes.forEach((note, index) => chips.push({ key: `exclude-note-${index}`, label: `Avoid note: ${toScentTitle(note)}` }))
+  preferences.exclude_accords.forEach((accord, index) => chips.push({ key: `exclude-accord-${index}`, label: `Avoid accord: ${toScentTitle(accord)}` }))
+  if (preferences.context) chips.push({ key: 'context', label: `Context: ${toScentTitle(preferences.context.replaceAll('_', ' '))}` })
 
   if (preferences.brand) chips.push({ key: 'brand', label: `Brand: ${preferences.brand}` })
   if (preferences.gender) chips.push({ key: 'gender', label: preferences.gender })
   preferences.notes.forEach((note, index) => chips.push({ key: `note-${index}`, label: `Note: ${toScentTitle(note)}` }))
   preferences.accords.forEach((accord, index) => chips.push({ key: `accord-${index}`, label: `Accord: ${toScentTitle(accord)}` }))
+  preferences.required_terms.forEach((term, index) => chips.push({ key: `required-term-${index}`, label: `Requires: ${toScentTitle(term)}` }))
+  preferences.or_groups.forEach((terms, index) => chips.push({ key: `or-group-${index}`, label: `Any of: ${terms.map(toScentTitle).join(' or ')}` }))
+  preferences.preferred_accords.forEach((accord, index) => chips.push({ key: `preferred-accord-${index}`, label: `Prefer accord: ${toScentTitle(accord)}` }))
   if (preferences.season) {
     chips.push({ key: 'season', label: preferences.season.charAt(0).toUpperCase() + preferences.season.slice(1) })
   }
@@ -189,12 +196,17 @@ function removeDiscoveryPreference(
   key: string,
 ) {
   if (key === 'brand') return { ...preferences, brand: null }
+  if (key === 'context') return { ...preferences, context: null }
+  if (key.startsWith('exclude-note-')) return { ...preferences, exclude_notes: preferences.exclude_notes.filter((_, index) => index !== Number(key.slice('exclude-note-'.length))) }
+  if (key.startsWith('exclude-accord-')) return { ...preferences, exclude_accords: preferences.exclude_accords.filter((_, index) => index !== Number(key.slice('exclude-accord-'.length))) }
   if (key === 'gender') return { ...preferences, gender: null }
   if (key === 'season') return { ...preferences, season: null }
   if (key === 'time-of-day') return { ...preferences, time_of_day: null }
   if (key === 'min-rating') return { ...preferences, min_rating: null }
   if (key === 'min-votes') return { ...preferences, min_votes: null }
   if (key === 'popular') return { ...preferences, prefer_popular: false }
+  if (key.startsWith('required-term-')) return { ...preferences, required_terms: preferences.required_terms.filter((_, index) => index !== Number(key.slice('required-term-'.length))) }
+  if (key.startsWith('or-group-')) return { ...preferences, or_groups: preferences.or_groups.filter((_, index) => index !== Number(key.slice('or-group-'.length))) }
   if (key === 'year-range') return { ...preferences, year_from: null, year_to: null }
   if (key.startsWith('note-')) {
     const index = Number(key.slice('note-'.length))
@@ -203,6 +215,10 @@ function removeDiscoveryPreference(
   if (key.startsWith('accord-')) {
     const index = Number(key.slice('accord-'.length))
     return { ...preferences, accords: preferences.accords.filter((_, itemIndex) => itemIndex !== index) }
+  }
+  if (key.startsWith('preferred-accord-')) {
+    const index = Number(key.slice('preferred-accord-'.length))
+    return { ...preferences, preferred_accords: preferences.preferred_accords.filter((_, itemIndex) => itemIndex !== index) }
   }
   return preferences
 }
@@ -852,14 +868,20 @@ function App() {
     setAccords(preferences.accords)
   }
 
-  function currentAiPreferences(sort: SortOption): DiscoveryResponse['preferences'] {
+  function currentAiPreferences(): DiscoveryResponse['preferences'] {
     return {
       brand: aiBrand || null, gender: (gender || null) as DiscoveryResponse['preferences']['gender'],
       season: aiSeason, time_of_day: aiDaypart, notes, accords,
+      required_terms: discoveryResult?.preferences.required_terms ?? [],
+      or_groups: discoveryResult?.preferences.or_groups ?? [],
+      preferred_accords: discoveryResult?.preferences.preferred_accords ?? [],
+      exclude_notes: discoveryResult?.preferences.exclude_notes ?? [],
+      exclude_accords: discoveryResult?.preferences.exclude_accords ?? [],
+      context: discoveryResult?.preferences.context ?? null,
       min_rating: minRating ? Number(minRating) : null,
       min_votes: aiMinVotes ? Number(aiMinVotes) : null,
       year_from: yearFrom ? Number(yearFrom) : null, year_to: yearTo ? Number(yearTo) : null,
-      prefer_popular: sort === 'popularity-desc', occasion: null,
+      prefer_popular: discoveryResult?.preferences.prefer_popular ?? false, occasion: discoveryResult?.preferences.occasion ?? null,
       needs_follow_up: false, follow_up_question: null,
     }
   }
@@ -1151,7 +1173,7 @@ function App() {
     brandName = selectedBrand,
     requestedSort = sortOption,
   ) {
-    if (aiSearch) return loadAiPage(pageNumber, currentAiPreferences(requestedSort), requestedSort, query, maxRating)
+    if (aiSearch) return loadAiPage(pageNumber, currentAiPreferences(), requestedSort, query, maxRating)
     setMatchReasons({})
     setLoading(true)
     setError('')
@@ -1502,7 +1524,14 @@ function App() {
             brand: null,
             gender: null,
             notes: [],
+            exclude_notes: [],
+            exclude_accords: [],
+            context: null,
+            occasion: null,
             accords: [],
+            required_terms: [],
+            or_groups: [],
+            preferred_accords: [],
             season: null,
             time_of_day: null,
             min_rating: null,
@@ -2386,18 +2415,28 @@ function App() {
             <label className="sr-only" htmlFor="discovery-prompt">
               Describe the fragrance you want
             </label>
-            <textarea
-              id="discovery-prompt"
-              value={discoveryPrompt}
-              onChange={(event) => setDiscoveryPrompt(event.target.value)}
-              placeholder={
-                discoveryResult?.follow_up_question
-                  ? discoveryResult.follow_up_question
-                  : 'Sweet for nighttime, fresh for summer, a woody scent for autumn...'
-              }
-              rows={2}
-              maxLength={600}
-            />
+            <div className="discovery-input-wrapper">
+              <textarea
+                id="discovery-prompt"
+                value={discoveryPrompt}
+                onChange={(event) => setDiscoveryPrompt(event.target.value)}
+                placeholder={
+                  discoveryResult?.follow_up_question
+                    ? discoveryResult.follow_up_question
+                    : 'Sweet for nighttime, fresh for summer, a woody scent for autumn...'
+                }
+                rows={2}
+                maxLength={600}
+                aria-describedby="discovery-character-count"
+              />
+              <span
+                id="discovery-character-count"
+                className="discovery-character-count"
+                aria-live="polite"
+              >
+                {discoveryPrompt.length} / 600
+              </span>
+            </div>
             <button type="submit" disabled={discoveryLoading || discoveryPrompt.trim().length < 3}>
               {discoveryLoading ? 'Finding matches…' : discoveryResult?.follow_up_question ? 'Continue' : 'Discover'}
             </button>
@@ -2582,7 +2621,7 @@ function App() {
                   }
                 >
                   <option value="rating-desc">
-                    Highest rating
+                    Highest rating (weighted)
                   </option>
                   <option value="rating-asc">
                     Lowest rating
@@ -3362,14 +3401,14 @@ function App() {
                     {selectedFragrance.gender ?? 'Unisex'}
                   </p>
 
-                  <p className="detail-summary">
-                    Rating:{' '}
-                    {selectedFragrance.rating_value !== null
-                      ? selectedFragrance.rating_value.toFixed(2)
-                      : 'Not rated'}
-                    {selectedFragrance.rating_count !== null &&
-                      ` from ${selectedFragrance.rating_count.toLocaleString()} votes`}
-                  </p>
+                  <FragranceRating
+                    key={`${selectedFragrance.id}-${currentUser?.id ?? 'guest'}`}
+                    fragranceId={selectedFragrance.id}
+                    userId={currentUser?.id}
+                    importedRating={selectedFragrance.rating_value}
+                    importedCount={selectedFragrance.rating_count}
+                    onSignIn={() => openAuthModal('login')}
+                  />
 
                   {selectedDiscoveryReasons.length > 0 && (
                     <section className="detail-ai-reasoning" aria-label="Why FragFriend chose this fragrance">
