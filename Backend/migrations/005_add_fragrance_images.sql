@@ -1,0 +1,3 @@
+ALTER TABLE fragrances
+  ADD COLUMN IF NOT EXISTS picture_url TEXT,
+  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;

@@ -16,6 +16,8 @@ export type BookmarkedFragrance = {
   rating_count: number | null
   year: number | null
   image_url: string | null
+  picture_url: string | null
+  thumbnail_url: string | null
 }
 
 function getAuthorizationHeaders() {

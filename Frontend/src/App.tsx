@@ -1,3 +1,4 @@
+import FragranceImage from './components/FragranceImage'
 import {
   useEffect,
   useRef,
@@ -74,6 +75,8 @@ type Fragrance = {
   rating_count: number | null
   year: number | null
   image_url: string | null
+  picture_url: string | null
+  thumbnail_url: string | null
 }
 
 type FragranceDetail = Fragrance & {
@@ -2647,18 +2650,7 @@ function App() {
           <article className="fragrance-card" key={fragrance.id}>
             {matchReasons[fragrance.id]?.length > 0 && <aside className={`search-ai-bubble ${index % 4 < 2 ? 'search-ai-bubble-left' : ''}`} aria-label="Why this matches"><strong>Why this matches</strong>{matchReasons[fragrance.id].map(reason => <p key={reason}>{reason}</p>)}</aside>}
             <div className="fragrance-image-wrapper">
-              {fragrance.image_url ? (
-                <img
-                  className="fragrance-image"
-                  src={fragrance.image_url}
-                  alt={`${fragrance.perfume} by ${fragrance.brand}`}
-                  loading="lazy"
-                />
-              ) : (
-                <div className="fragrance-image-placeholder">
-                  <span>{fragrance.brand.charAt(0)}</span>
-                </div>
-              )}
+              <FragranceImage key={fragrance.id} fragrance={fragrance} />
             </div>
 
             <p className="brand">{fragrance.brand}</p>
@@ -2861,20 +2853,7 @@ function App() {
                         −
                       </button>
                       <div className="fragrance-image-wrapper">
-                        {fragrance.image_url ? (
-                          <img
-                            className="fragrance-image"
-                            src={fragrance.image_url}
-                            alt={`${fragrance.perfume} by ${fragrance.brand}`}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="fragrance-image-placeholder">
-                            <span>
-                              {fragrance.brand.charAt(0)}
-                            </span>
-                          </div>
-                        )}
+                        <FragranceImage key={fragrance.id} fragrance={fragrance} />
                       </div>
 
                       <p className="brand">
@@ -3264,20 +3243,7 @@ function App() {
                             key={fragrance.id}
                           >
                             <div className="fragrance-image-wrapper">
-                              {fragrance.image_url ? (
-                                <img
-                                  className="fragrance-image"
-                                  src={fragrance.image_url}
-                                  alt={`${fragrance.perfume} by ${fragrance.brand}`}
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="fragrance-image-placeholder">
-                                  <span>
-                                    {fragrance.brand.charAt(0)}
-                                  </span>
-                                </div>
-                              )}
+                              <FragranceImage key={fragrance.id} fragrance={fragrance} />
                             </div>
 
                             <p className="brand">
@@ -3375,16 +3341,7 @@ function App() {
             {!detailLoading && selectedFragrance && (
               <>
                 <div className="detail-image-wrapper">
-                  {selectedFragrance.image_url ? (
-                    <img
-                      src={selectedFragrance.image_url}
-                      alt={`${selectedFragrance.perfume} by ${selectedFragrance.brand}`}
-                    />
-                  ) : (
-                    <div className="detail-image-placeholder">
-                      {selectedFragrance.brand.charAt(0)}
-                    </div>
-                  )}
+                  <FragranceImage key={selectedFragrance.id} fragrance={selectedFragrance} detail />
                 </div>
 
                 <div className="detail-content">
@@ -3643,6 +3600,11 @@ function App() {
           </section>
         </div>
       )}
+      <footer className="image-credits">
+        Fragrance data and image links: Le Decanteur's Fragrantica dataset (Kaggle),
+        {' '}<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>.
+        {' '}Images served by <a href="https://www.fragrantica.com/">Fragrantica</a>.
+      </footer>
     </main>
   )
 }

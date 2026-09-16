@@ -13,6 +13,8 @@ class FragranceSummary(BaseModel):
     rating_count: int | None
     year: int | None = None
     image_url: str | None = None
+    picture_url: str | None = None
+    thumbnail_url: str | None = None
 
 
 class FragranceSearchResult(FragranceSummary):

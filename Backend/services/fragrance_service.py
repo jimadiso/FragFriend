@@ -283,7 +283,7 @@ def search_fragrances(
     offset: int = 0
 ):
     query = """
-        SELECT f.id, f.perfume, f.brand, f.country, f.gender, f.rating_value, f.rating_count, f.year, f.image_url,
+        SELECT f.id, f.perfume, f.brand, f.country, f.gender, f.rating_value, f.rating_count, f.year, f.image_url, f.picture_url, f.thumbnail_url,
                f.mainaccord1, f.mainaccord2, f.mainaccord3, f.mainaccord4, f.mainaccord5
         FROM fragrances f
         LEFT JOIN fragrance_source_metadata m ON m.fragrance_id = f.id
@@ -612,7 +612,7 @@ def get_fragrances(limit: int = 20, offset: int = 0):
     with engine.connect() as conn:
         result = conn.execute(
             text("""
-                SELECT id, perfume, brand, country, gender, image_url,
+                SELECT id, perfume, brand, country, gender, image_url, picture_url, thumbnail_url,
                        rating_value, rating_count, year
                 FROM fragrances
                 LIMIT :limit

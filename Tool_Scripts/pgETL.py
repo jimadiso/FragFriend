@@ -62,6 +62,9 @@ df["rating_value"] = (
 df["year"] = df["year"].astype("Int64")
 df["rating_count"] = df["rating_count"].astype("Int64")
 df["image_url"] = None
+# The legacy CSV has no image fields; the JSONL corpus importer supplies these.
+df["picture_url"] = None
+df["thumbnail_url"] = None
 
 
 df.to_sql(

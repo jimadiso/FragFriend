@@ -68,3 +68,14 @@ def test_detail_endpoint_handles_flat_notes_and_null_country(monkeypatch):
     assert response.status_code == 200
     assert response.json()['flat_notes'] == 'Rose'
     assert response.json()['country'] is None
+
+
+def test_image_links_are_imported_and_missing_values_are_nullable():
+    record = incoming()
+    record.update(picture="https://fimgs.net/mdimg/perfume/375x500.100.jpg",
+                  thumbnail="https://fimgs.net/mdimg/perfume/m.100.jpg")
+    row, _ = project(record, None, 7)
+    assert row["picture_url"] == record["picture"]
+    assert row["thumbnail_url"] == record["thumbnail"]
+    row, _ = project(incoming(), None, 7)
+    assert row["picture_url"] is None and row["thumbnail_url"] is None

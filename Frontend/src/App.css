@@ -1177,7 +1177,7 @@
 .fragrance-image-wrapper {
   position: relative;
   width: 100%;
-  height: 290px;
+  aspect-ratio: 3 / 4;
   margin-bottom: 24px;
   overflow: hidden;
   border-radius: 16px;
@@ -2977,3 +2977,6 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.image-credits { margin: 32px auto 16px; max-width: 900px; text-align: center; color: #806b5e; font-size: 0.8rem; line-height: 1.6; }
+.image-credits a { color: #986c50; }

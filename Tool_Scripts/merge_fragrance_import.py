@@ -24,7 +24,7 @@ CORPUS = "414478c1921f30dd40ef140258d7f96411f5192ab20a1e76337578155ef71af4"
 COLUMNS = ["id", "url", "perfume", "brand", "country", "gender", "rating_value",
            "rating_count", "year", "top_notes", "middle_notes", "base_notes",
            "perfumer1", "perfumer2", "mainaccord1", "mainaccord2", "mainaccord3",
-           "mainaccord4", "mainaccord5", "image_url", "flat_notes", "accords_all"]
+           "mainaccord4", "mainaccord5", "image_url", "flat_notes", "accords_all", "picture_url", "thumbnail_url"]
 METADATA_FIELDS = ["notes", "accords", "seasons", "daypart", "longevity", "sillage",
                    "price_value", "community_gender", "rating", "people", "perfumers"]
 
@@ -89,7 +89,9 @@ def project(record, old, local_id):
     if perfumers:
         row["perfumer1"] = perfumers[0]
         row["perfumer2"] = perfumers[1] if len(perfumers) > 1 else None
-    # Country is absent from this corpus. Remote picture links are not imported.
+    # Country is absent from this corpus. Missing image links remain nullable.
+    row["picture_url"] = record.get("picture") or None
+    row["thumbnail_url"] = record.get("thumbnail") or None
     stamp = (record.get("meta") or {}).get("scraped_at")
     if type(stamp) not in (int, float) or stamp <= 0:
         raise InputError(f"Source ID {record['id']}: missing capture timestamp.")

@@ -81,3 +81,27 @@ The project separates data preparation and database loading into two processes:
 2. `Tool_Scripts/pgETL.py` applies the database column schema and loads the prepared records into PostgreSQL.
 
 Raw and generated data files are intentionally excluded from this repository. Running the pipelines requires a legally obtained source dataset with the expected schema. This repository does not redistribute scraped data or images because their redistribution rights have not been established.
+
+
+## Fragrance images and credits
+
+Fragrance data and image links are from Le Decanteur's Fragrantica dataset on Kaggle,
+identified by the supplied dataset as CC BY-NC-SA 4.0. Images are served directly
+from Fragrantica's fimgs.net CDN; the dataset contains URLs, not bundled image files.
+The dataset license should not be treated as independent verification of rights to
+every externally hosted photograph. FragFriend does not claim ownership of those images.
+License: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Source imagery: https://www.fragrantica.com/
+
+Apply `Backend/migrations/005_add_fragrance_images.sql`, then run:
+
+```powershell
+python Tool_Scripts/backfill_fragrance_images.py Fragrance_Data/candidate/archive/perfumes.jsonl --apply
+```
+
+Omit `--apply` to preview the matched row count. Backfill uses source IDs from
+`fragrance_source_metadata`, updates only image URL columns, and is safe to repeat.
+The JSONL merge importer also reads `picture` and `thumbnail` for future imports.
+Cards use thumbnails; detail views use pictures. Missing or failed images retain
+monograms. Four picture/thumbnail pairs loaded successfully from localhost:5173
+on 2026-09-16; verify again from the deployment origin before publishing.

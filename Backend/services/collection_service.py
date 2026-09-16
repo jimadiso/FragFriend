@@ -219,7 +219,9 @@ def get_collection(
             fragrances.rating_value,
             fragrances.rating_count,
             fragrances.year,
-            fragrances.image_url
+            fragrances.image_url,
+            fragrances.picture_url,
+            fragrances.thumbnail_url
         FROM collection_fragrances
         JOIN fragrances
           ON fragrances.id =

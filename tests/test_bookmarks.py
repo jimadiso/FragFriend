@@ -24,7 +24,7 @@ BOOKMARKED_FRAGRANCE = {
     "rating_value": 3.7,
     "rating_count": 271,
     "year": 2004,
-    "image_url": None,
+    "image_url": None, "picture_url": "https://fimgs.net/mdimg/perfume/375x500.3.jpg", "thumbnail_url": "https://fimgs.net/mdimg/perfume/m.3.jpg",
 }
 
 

@@ -28,7 +28,7 @@ def test_discovery_returns_only_database_matches(monkeypatch):
         "fragrance": {
             "id": 77, "perfume": "Database Scent", "brand": "Example", "country": None,
             "gender": "Unisex", "rating_value": 4.2, "rating_count": 10, "year": 2020,
-            "image_url": None, "mainaccord1": "sweet", "mainaccord2": None,
+            "image_url": None, "picture_url": "https://fimgs.net/mdimg/perfume/375x500.3.jpg", "thumbnail_url": "https://fimgs.net/mdimg/perfume/m.3.jpg", "mainaccord1": "sweet", "mainaccord2": None,
             "mainaccord3": None, "mainaccord4": None, "mainaccord5": None,
         },
         "why_matched": ["Has a sweet accord.", "Has 30 community night votes."],

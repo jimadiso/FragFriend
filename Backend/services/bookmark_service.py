@@ -163,7 +163,9 @@ def get_bookmarks(
             fragrances.rating_value,
             fragrances.rating_count,
             fragrances.year,
-            fragrances.image_url
+            fragrances.image_url,
+            fragrances.picture_url,
+            fragrances.thumbnail_url
         FROM bookmarks
         JOIN fragrances
           ON fragrances.id = bookmarks.fragrance_id

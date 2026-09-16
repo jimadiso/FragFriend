@@ -421,7 +421,7 @@ def search_database(
             return connection.execute(text(f"SELECT count(*) FROM fragrances f LEFT JOIN fragrance_source_metadata m ON m.fragrance_id = f.id WHERE {' AND '.join(conditions)}"), params).scalar_one()
     query = f"""
         SELECT f.id, f.perfume, f.brand, f.country, f.gender, f.rating_value,
-               f.rating_count, f.year, f.image_url, f.mainaccord1, f.mainaccord2,
+               f.rating_count, f.year, f.image_url, f.picture_url, f.thumbnail_url, f.mainaccord1, f.mainaccord2,
                f.mainaccord3, f.mainaccord4, f.mainaccord5,
                concat_ws(',', f.top_notes, f.middle_notes, f.base_notes, f.flat_notes) AS all_notes,
                f.accords_all,
@@ -442,7 +442,7 @@ def search_database(
     for row in rows:
         fragrance = {key: row[key] for key in (
             "id", "perfume", "brand", "country", "gender", "rating_value",
-            "rating_count", "year", "image_url", "mainaccord1", "mainaccord2",
+            "rating_count", "year", "image_url", "picture_url", "thumbnail_url", "mainaccord1", "mainaccord2",
             "mainaccord3", "mainaccord4", "mainaccord5",
         )}
         matches.append({"fragrance": fragrance, "why_matched": _reasons(row, preferences)})
