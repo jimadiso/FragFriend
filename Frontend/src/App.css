@@ -2979,4 +2979,34 @@
 }
 
 .image-credits { margin: 32px auto 16px; max-width: 900px; text-align: center; color: #806b5e; font-size: 0.8rem; line-height: 1.6; }
+
+.active-filter-tags { grid-column: 1 / -1; width: 100%; padding: 16px 20px; border: 1px solid #ded2c8; border-radius: 16px; background: #fffaf5; text-align: left; }
+.active-filter-tags > span { display: block; margin-bottom: 10px; color: #75513d; font-weight: 700; }
+.active-filter-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.active-filter-list button { padding: 7px 12px; border: 1px solid #c7ae9c; border-radius: 20px; color: #654632; background: #f2e6dc; cursor: pointer; }
+.active-filter-list button span { margin-left: 8px; }
+.active-filter-list .clear-filter-tags { background: transparent; }
+.active-filter-list button:disabled { opacity: 0.6; cursor: wait; }
+.comparison-controls, .comparison-heading { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.comparison-controls p { flex-basis: 100%; text-align: center; }
+.comparison-controls button, .comparison-heading button, .library-comparison > p button { border: 1px solid #a88165; border-radius: 18px; padding: 10px 18px; color: #694b38; background: #fffaf5; cursor: pointer; }
+.comparison-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+.saved-library.is-comparing { width: min(1840px, calc(100vw - 48px)); }
+.comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; justify-content: center; align-items: stretch; gap: 24px; margin-inline: auto; width: 100%; }
+.comparison-detail-card { box-sizing: border-box; width: 100%; min-width: 0; height: 100%; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 24px; padding: 28px; overflow-wrap: anywhere; }
+.comparison-detail-card .detail-content { min-width: 0; padding-right: 0; }
+.comparison-detail-card .detail-content h2 { margin-right: 0; font-size: clamp(2rem, 2.5vw, 3.2rem); }
+.comparison-detail-card .detail-image-wrapper { min-width: 0; }
+.comparison-detail-card .detail-notes > div { min-width: 0; }
+.selectable-card { cursor: pointer; }
+.fragrance-card.is-selected { border-color: #946749; box-shadow: 0 0 0 2px #946749; }
+.compare-select { margin: 0 0 16px; padding: 8px 12px; border: 1px solid #946749; border-radius: 16px; background: #fffaf5; color: #75513d; cursor: pointer; }
+.compare-select[aria-pressed="true"] { color: #fffaf5; background: #75513d; }
+.compare-select:focus-visible, .active-filter-list button:focus-visible { outline: 3px solid #946749; outline-offset: 3px; }
+@media (max-width: 1320px) {
+  .comparison-grid { grid-template-columns: minmax(0, 980px); }
+}
+@media (max-width: 760px) {
+  .comparison-detail-card { grid-template-columns: 1fr; }
+}
 .image-credits a { color: #986c50; }

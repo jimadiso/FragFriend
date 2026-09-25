@@ -87,6 +87,21 @@ class DiscoveryMatch(BaseModel):
     why_matched: list[str]
 
 
+class FilteredBrandRequest(BaseModel):
+    preferences: DiscoveryPreferences
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=8, ge=1, le=50)
+    name: str = Field(default="", max_length=200)
+    max_rating: float | None = Field(default=None, ge=0, le=5)
+    sort_by: Literal["count", "rating", "name"] = "count"
+    order: Literal["asc", "desc"] = "desc"
+
+
+class FilteredBrandResponse(BaseModel):
+    brands: list[BrandSearchResult]
+    total: int
+
+
 class DiscoveryResponse(BaseModel):
     total: int = 0
     preferences: DiscoveryPreferences

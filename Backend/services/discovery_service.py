@@ -307,12 +307,14 @@ def search_database(
     sort_by: str | None = None,
     order: str = "desc",
     count_only: bool = False,
+    group_by_brand: bool = False,
+    brand_sort: str = "count",
 ) -> list[dict] | int:
     conditions = ["1=1"]
     params: dict[str, object] = {"limit": limit, "offset": offset}
     effective_exclude_accords = _merge_context_exclusions(preferences)
     if name:
-        conditions.append("(f.perfume ILIKE :name OR f.brand ILIKE :name)")
+        conditions.append("f.brand ILIKE :name" if group_by_brand else "(f.perfume ILIKE :name OR f.brand ILIKE :name)")
         params["name"] = f"%{name.strip()}%"
     if max_rating is not None:
         conditions.append("f.rating_value <= :max_rating")
@@ -388,6 +390,17 @@ def search_database(
     if preferences.time_of_day:
         conditions.append("COALESCE((m.attributes -> 'daypart' ->> :time_of_day)::integer, 0) > 0")
         params["time_of_day"] = preferences.time_of_day
+    if group_by_brand:
+        source = f"FROM fragrances f LEFT JOIN fragrance_source_metadata m ON m.fragrance_id = f.id WHERE {' AND '.join(conditions)} AND f.brand IS NOT NULL"
+        with engine.connect() as connection:
+            if count_only:
+                return connection.execute(text(f"SELECT count(DISTINCT f.brand) {source}"), params).scalar_one()
+            column = {"count": "fragrance_count", "rating": "average_rating", "name": "f.brand"}[brand_sort]
+            direction = "ASC" if order == "asc" else "DESC"
+            query = f"""SELECT f.brand, count(*) AS fragrance_count, AVG(f.rating_value) AS average_rating
+                {source} GROUP BY f.brand ORDER BY {column} {direction} NULLS LAST, f.brand ASC
+                LIMIT :limit OFFSET :offset"""
+            return [dict(row._mapping) for row in connection.execute(text(query), params)]
     order_by = (
         "f.rating_count DESC NULLS LAST, f.rating_value DESC NULLS LAST, f.perfume ASC"
         if preferences.prefer_popular

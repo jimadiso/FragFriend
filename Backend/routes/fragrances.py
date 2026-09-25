@@ -13,6 +13,8 @@ from Backend.models.fragrance import (
     DiscoveryRequest,
     DiscoveryMoreRequest,
     DiscoveryResponse,
+    FilteredBrandRequest,
+    FilteredBrandResponse,
 )
 from Backend.services import discovery_service, fragrance_service
 
@@ -87,6 +89,20 @@ def discover_more_fragrances(payload: DiscoveryMoreRequest):
         matches=matches,
         total=discovery_service.search_database(payload.preferences, count_only=True, **options),
     )
+
+@router.post("/discover/brands", response_model=FilteredBrandResponse)
+def discover_brands(payload: FilteredBrandRequest):
+    if payload.preferences.min_rating is not None and payload.max_rating is not None and payload.preferences.min_rating > payload.max_rating:
+        raise HTTPException(status_code=422, detail="Minimum rating exceeds maximum rating.")
+    if payload.preferences.year_from is not None and payload.preferences.year_to is not None and payload.preferences.year_from > payload.preferences.year_to:
+        raise HTTPException(status_code=422, detail="Starting year exceeds ending year.")
+    options = dict(limit=payload.limit, offset=payload.offset, name=payload.name,
+                   max_rating=payload.max_rating, order=payload.order, group_by_brand=True, brand_sort=payload.sort_by)
+    return FilteredBrandResponse(
+        brands=discovery_service.search_database(payload.preferences, **options),
+        total=discovery_service.search_database(payload.preferences, count_only=True, **options),
+    )
+
 
 @router.get("/", response_model=list[FragranceSummary])
 def get_fragrances(
